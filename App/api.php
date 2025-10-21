@@ -1,3 +1,18 @@
+// --- Pythonサーバー自動起動（ローカル開発用/Windows） ---
+$python_port = 8765;
+$python_script = __DIR__ . DIRECTORY_SEPARATOR . 'server.py';
+$port_in_use = false;
+exec("netstat -ano | findstr :$python_port", $output);
+foreach ($output as $line) {
+    if (strpos($line, (string)$python_port) !== false) {
+        $port_in_use = true;
+        break;
+    }
+}
+if (!$port_in_use && file_exists($python_script)) {
+    // バックグラウンドでPython起動（Windows用）
+    pclose(popen("start /B python \"$python_script\"", "r"));
+}
 <?php
 // --- レスポンスをJSON形式に設定 ---
 header('Content-Type: application/json');
