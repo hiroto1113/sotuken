@@ -473,6 +473,10 @@ const receivedImage = new Image();
 // === MediaPipe Pose クライアント描画用（JSのみ運用）===
 let pose = null;
 let lastPoseResults = null;
+// モーション由来のボーナス計算用（シンプルなフレーム間速度）
+let prevPoseLm = null;
+let prevPoseTs = 0;
+let motionEma = 0; // 指数移動平均で安定化
 
 // JSのみで処理するため、クライアント描画を有効化
 let useClientLandmark = true; // trueでクライアント描画
@@ -586,8 +590,9 @@ function computeCombatStatsFromLandmarks(lm) {
     };
     // メトリクス
     const top = lm[0];
-    const ankleL = lm[29];
-    const ankleR = lm[30];
+    // MediaPipe Pose のインデックスに合わせて足首を修正: 左=27, 右=28
+    const ankleL = lm[27];
+    const ankleR = lm[28];
     const wristL = lm[15];
     const wristR = lm[16];
     const shoulderL = lm[11];
@@ -716,11 +721,51 @@ async function startMeasurement() {
                 lastPoseResults = results;
                 // スコアをJS側で計算
                 if (results && results.poseLandmarks) {
-                    const stats = computeCombatStatsFromLandmarks(results.poseLandmarks);
+                    const lm = results.poseLandmarks;
+                    const stats = computeCombatStatsFromLandmarks(lm);
+
+                    // 速度ボーナス: 前フレームとの移動量を高さで正規化し、時間で割って速度に相当する値を算出
+                    try {
+                        const now = performance.now();
+                        const dt = prevPoseTs ? Math.max(0.016, (now - prevPoseTs) / 1000) : 0.033; // 秒
+                        const idxs = [11, 12, 15, 16, 27, 28]; // 両肩・両手首・両足首
+                        if (prevPoseLm && Array.isArray(prevPoseLm) && stats.height > 1e-6) {
+                            let sum = 0, n = 0;
+                            for (const i of idxs) {
+                                const a = lm[i], b = prevPoseLm[i];
+                                if (a && b) {
+                                    const dx = (a.x - b.x);
+                                    const dy = (a.y - b.y);
+                                    const dist = Math.hypot(dx, dy);
+                                    sum += dist; n++;
+                                }
+                            }
+                            if (n > 0) {
+                                const meanMove = (sum / n);            // 画面正規化座標での平均移動量
+                                const normByHeight = meanMove / Math.max(stats.height, 1e-6);
+                                const speedLike = normByHeight / dt;   // 時間で割って「速度」らしさ
+                                // クリップしてEMA
+                                const clipped = Math.max(0, Math.min(3.0, speedLike));
+                                motionEma = motionEma * 0.85 + clipped * 0.15;
+                                const SPEED_GAIN = 120000; // 調整係数（体感で程よい値）
+                                const speed_bonus = motionEma * SPEED_GAIN;
+                                stats.speed_bonus = Math.round(speed_bonus);
+                                stats.total_power = Math.max(0, Math.round(stats.base_power + stats.pose_bonus + stats.expression_bonus + stats.speed_bonus));
+                            }
+                        }
+                        prevPoseLm = lm.map(p => ({ x: p.x, y: p.y }));
+                        prevPoseTs = now;
+                    } catch (e) {
+                        // 計算失敗時は無視（速度ボーナス0）
+                    }
                     updateStats(stats);
                 }
                 // 表示はビデオのみ（骨格は非表示）
                 drawLandmarksOnCanvas(results);
+                // ランドマークが得られない場合は明確な表示
+                if (!results || !results.poseLandmarks) {
+                    try { measurementElements.socketStatus.textContent = 'NO TARGET'; measurementElements.socketStatus.className = 'text-yellow-400'; } catch(e){}
+                }
             });
             try { measurementElements.socketStatus.textContent = 'POSE READY'; measurementElements.socketStatus.className = 'text-yellow-400'; } catch(e){}
 
@@ -765,6 +810,12 @@ async function startMeasurement() {
                     } catch(e){}
                 }
             }, 3500);
+        } else if (useClientLandmark && !window.Pose) {
+            // Poseスクリプト未読み込み（CDNブロック等）
+            try {
+                measurementElements.socketStatus.textContent = 'POSE SCRIPT MISSING';
+                measurementElements.socketStatus.className = 'text-red-500';
+            } catch(e){}
         }
 
         // フォールバック: Pose が利用できない場合は video を canvas に直接描画するループを開始
