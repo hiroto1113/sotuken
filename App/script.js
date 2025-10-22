@@ -252,10 +252,31 @@ function setupBGM() {
     const player = document.getElementById('bgm-player');
     if (!select || !btnPlay || !btnStop || !player) return;
 
+    // 初期状態: なしのみ
+    select.innerHTML = '<option value="">なし</option>';
+    select.disabled = true;
+    btnPlay.disabled = true;
+    btnStop.disabled = true;
+
     fetch('music-list.php')
         .then(r => r.json())
         .then(json => {
-            if (!json || !Array.isArray(json.files)) return;
+            if (!json || !Array.isArray(json.files) || json.files.length === 0) {
+                // BGMファイルが見つからない場合
+                const opt = document.createElement('option');
+                opt.value = '';
+                opt.textContent = 'BGMがありません';
+                select.appendChild(opt);
+                select.disabled = true;
+                btnPlay.disabled = true;
+                btnStop.disabled = true;
+                return;
+            }
+            // BGMファイルがある場合
+            select.innerHTML = '<option value="">なし</option>';
+            select.disabled = false;
+            btnPlay.disabled = false;
+            btnStop.disabled = false;
             // 数値連番（bgm1, bgm2, ...）を優先して昇順ソート
             const parsed = json.files.map((name) => {
                 const m = name.match(/^bgm(\d+)\./i);
@@ -279,7 +300,13 @@ function setupBGM() {
                 select.value = 'music/' + preferred.name;
             }
         })
-        .catch(() => {});
+        .catch(() => {
+            // 通信エラー時もBGM選択不可
+            select.innerHTML = '<option value="">BGMがありません</option>';
+            select.disabled = true;
+            btnPlay.disabled = true;
+            btnStop.disabled = true;
+        });
 
     btnPlay.addEventListener('click', async () => {
         const url = select.value;
