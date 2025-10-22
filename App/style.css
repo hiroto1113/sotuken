@@ -8,8 +8,20 @@
     font-style: normal;
 }
 body {
+    /* --- 背景画像を App/img 以下の画像に差し替え可能にする --- */
+    /* 使い方:
+       1) App/img に画像を置く（例: img/bg.jpg）
+       2) 既定で img/bg.jpg が使われます。
+       3) 別の画像を使いたい場合は index.html の body タグで CSS 変数を上書きします:
+          <body style="--bg-image: url('img/your-image.png')">...
+    */
+    --bg-image: url('img/bg.jpg'); /* デフォルト: App/img/bg.jpg */
     min-height: 100vh;
-    background: linear-gradient(135deg, #0ee5b3 0%, #0ebd54 100%);
+    /* 複数背景: 先に画像、その後にグラデーション（フォールバック）を重ねる */
+    background-image: var(--bg-image), linear-gradient(135deg, #0ee5b3 0%, #0ebd54 100%);
+    background-size: cover, auto;
+    background-position: center center, 0 0;
+    background-repeat: no-repeat, repeat;
     font-family: sans-serif;
     color: #e0eaff;
     position: relative;
@@ -218,4 +230,20 @@ body::before {
 @media (max-width: 640px) {
   .hud-button { padding: 6px 18px; font-size: 0.95rem; }
     .hud-sub-readouts { bottom: 110px; right: 100px; font-size: 0.95rem; }
+}
+
+/* レスポンシブ: 小画面では画像を切らずに表示するため contain を使う */
+@media (max-width: 900px) {
+    body {
+        /* 背景画像の高さをビューポートに合わせて常に下まで届かせる（横幅は自動調整） */
+        /* これにより画像の縦方向が常にカバーされ、上下に黒い余白が出にくくなる */
+        background-size: auto 100%, auto;
+        background-position: center center, 0 0;
+        background-attachment: scroll; /* 固定だとモバイルで不自然な場合がある */
+    }
+}
+
+/* タッチデバイスでのパフォーマンス向上: 大画面でもスクロール中にちらつく場合は fixed を解除 */
+@media (hover: none) and (pointer: coarse) {
+    body { background-attachment: scroll; }
 }
