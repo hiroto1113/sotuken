@@ -1,14 +1,9 @@
-    <div id="image-modal" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:1000;background:rgba(0,0,0,0.7);justify-content:center;align-items:center;">
-        <div style="position:relative;max-width:80vw;max-height:80vh;">
-            <button id="image-modal-close" onclick="window.closeImageModal && window.closeImageModal()" style="position:absolute;top:-32px;right:-32px;width:48px;height:48px;background:#222;border:none;border-radius:50%;color:#fff;font-size:2em;box-shadow:0 0 12px #00ff41;cursor:pointer;z-index:1010;">×</button>
-            <img id="image-modal-img" src="" alt="拡大画像" style="max-width:80vw;max-height:80vh;border-radius:16px;box-shadow:0 0 32px #00ff41;">
-        </div>
-    </div>
 <!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- ★★★ 新しいタイトルとフォント ★★★ -->
     <title>POWER SCAN</title>
     <!-- Tailwind CDN (temporary restore to recover layout) -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -24,7 +19,7 @@
     <!-- MediaPipe Camera Utils -->
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 </head>
-<body style="--bg-image: url('img/img.png')" class="bg-gray-900 text-white font-tech-mono antialiased flex items-center justify-center min-h-screen">
+<body class="bg-gray-900 text-white font-tech-mono antialiased flex items-center justify-center min-h-screen">
     <!-- 効果音（sfx/ 配下に整理。未移動でも後述JSで自動フォールバックします） -->
     <audio id="se-button" src="sfx/button.mp3" preload="auto"></audio>
     <audio id="se-roulette" src="sfx/roulette.mp3" preload="auto"></audio>
@@ -136,8 +131,6 @@
             </div>
         </div>
         
-        
-        
         <!-- ... ランキング画面は変更なし ... -->
 
         <!-- ===== 名前入力モーダル ===== -->
@@ -152,38 +145,7 @@
                 </div>
             </div>
         </div>
-    <div id="screen-ranking" class="screen hidden card space-y-6"><h2 class="text-3xl font-bold text-center font-orbitron">BATTLE INDEX ランキング</h2><div id="ranking-list" class="space-y-3"></div><div class="ranking-nav"><button id="ranking-prev" class="ranking-arrow">まえ</button><button id="ranking-next" class="ranking-arrow">つぎ</button></div><div class="flex gap-4 justify-center pt-4"><button id="btn-back-to-title-3" class="btn btn-secondary">戻る</button></div></div>
-
-        <!-- ===== バトル画面（和風レイアウト・シンプルUI） ===== -->
-        <div id="screen-battle" class="screen hidden card" style="background:url('img/bg_washitsu.png') center/cover no-repeat; min-height:600px; position:relative;">
-            <div class="battle-header">
-                <div class="battle-label battle-label-1">1P</div>
-                <div class="battle-label battle-label-2">2P</div>
-                <div class="battle-timer" id="battle-timer">00:10</div>
-            </div>
-            <div class="battle-gauges">
-                <div class="battle-gauge-box">
-                    <div class="battle-gauge" id="battle-gauge1"></div>
-                    <div class="battle-score" id="battle-score1">400000/400000</div>
-                    <div class="battle-name" id="battle-name1">1P</div>
-                </div>
-                <div class="battle-gauge-box">
-                    <div class="battle-gauge" id="battle-gauge2"></div>
-                    <div class="battle-score" id="battle-score2">400000/400000</div>
-                    <div class="battle-name" id="battle-name2">2P</div>
-                </div>
-            </div>
-            <div class="battle-main">
-                <img id="battle-img1" src="img/player1.jpg" alt="1P" class="battle-img">
-                <div class="battle-center">
-                    <button id="battle-start-btn" class="battle-start-btn">1Pスタート</button>
-                    <img src="img/mause.png" alt="mouse" class="battle-mouse hidden" id="battle-mouse">
-                    <div class="battle-instruct" id="battle-instruct">バトル開始ボタンを押してください</div>
-                </div>
-                <img id="battle-img2" src="img/player2.jpg" alt="2P" class="battle-img">
-            </div>
-            <button id="battle-exit" class="btn battle-exit">exit</button>
-        </div>
+    <div id="screen-ranking" class="screen hidden card space-y-6"><h2 class="text-3xl font-bold text-center font-orbitron">POWER SCAN ランキング</h2><div id="ranking-list" class="space-y-3"></div><div class="flex gap-4 justify-center pt-4"><button id="btn-back-to-title-3" class="btn btn-secondary">もどる</button></div></div>
 
     </div>
     
