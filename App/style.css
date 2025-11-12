@@ -99,13 +99,6 @@ body::before {
     letter-spacing: 0.08em;
     animation: neon-flicker 2.2s infinite alternate;
 }
-@keyframes neon-flicker {
-    0% { text-shadow: 0 0 8px #00ff41, 0 0 24px #0fffc1, 0 0 32px #00ff41; }
-    90% { text-shadow: 0 0 8px #00ff41, 0 0 24px #0fffc1, 0 0 32px #00ff41; }
-    92% { text-shadow: 0 0 2px #00ff41, 0 0 4px #0fffc1, 0 0 8px #00ff41; }
-    94% { text-shadow: 0 0 16px #00ff41, 0 0 32px #0fffc1, 0 0 64px #00ff41; }
-    100% { text-shadow: 0 0 8px #00ff41, 0 0 24px #0fffc1, 0 0 32px #00ff41; }
-}
 
 /* --- スクロールバーもサイバー風に --- */
 ::-webkit-scrollbar {
