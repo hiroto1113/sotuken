@@ -8,12 +8,28 @@
     font-style: normal;
 }
 body {
+    /* --- 背景画像を App/img 以下の画像に差し替え可能にする --- */
+    /* 使い方:
+       1) App/img に画像を置く（例: img/bg.jpg）
+       2) 既定で img/bg.jpg が使われます。
+       3) 別の画像を使いたい場合は index.html の body タグで CSS 変数を上書きします:
+          <body style="--bg-image: url('img/your-image.png')">...
+    */
+    --bg-image: url('img/bg.jpg'); /* デフォルト: App/img/bg.jpg */
     min-height: 100vh;
-    background: linear-gradient(135deg, #0ee5b3 0%, #0ebd54 100%);
+    /* 複数背景: 先に画像、その後にグラデーション（フォールバック）を重ねる */
+    background-image: var(--bg-image), linear-gradient(135deg, #0ee5b3 0%, #0ebd54 100%);
+    background-size: cover, auto;
+    background-position: center center, 0 0;
+    background-repeat: no-repeat, repeat;
     font-family: sans-serif;
     color: #e0eaff;
     position: relative;
     overflow-x: hidden;
+    /* transform: scale(1.5); 拡大解除 */
+    /* transform-origin: top center; 拡大解除 */
+    overflow: hidden;
+    height: 100vh;
 }
 body::before {
     content: '';
@@ -56,6 +72,8 @@ body::before {
     color: #f5f5f5;
     -webkit-text-stroke: 1px black;
     box-shadow: 0 0 8px #00ff41;
+    font-size: 1em;
+    padding: 10px 30px;
 }
 .btn.btn-secondary:hover {
     background: #101820;
@@ -98,7 +116,6 @@ body::before {
    -webkit-text-stroke: 1px black;
     letter-spacing: 0.08em;
     animation: neon-flicker 2.2s infinite alternate;
-    margin-top: -100px;
 }
 @keyframes neon-flicker {
     0% { text-shadow: 0 0 8px #00ff41, 0 0 24px #0fffc1, 0 0 32px #00ff41; }
@@ -177,9 +194,9 @@ body::before {
 .text-green-400 { color: #4ade80 !important; }
 .text-red-500 { color: #ef4444 !important; }
 .hud-main-readout { position: absolute; top: 32px; right: 48px; text-align: right; }
-.readout-label { font-size: 1.1rem; letter-spacing: 0.05em; }
-.readout-value { font-size: 4.2rem; font-family: 'Orbitron', sans-serif; line-height: 1; text-shadow: 0 0 12px #00ff41, 0 0 32px #00ff41; }
-.hud-sub-readouts { position: absolute; bottom: 32px; right: 48px; text-align: right; font-size: 1.05rem; line-height: 1.7; }
+.readout-label { font-size: 1.2rem; letter-spacing: 0.05em; }
+.readout-value { font-size: 2rem; font-weight: bold; font-family: 'Orbitron', sans-serif; line-height: 1; text-shadow: 0 0 12px #00ff41, 0 0 32px #00ff41; }
+.hud-sub-readouts { position: absolute; bottom: 96px; right: 140px; text-align: right; font-size: 1em; line-height: 1.7; }
 .hud-bottom-bar { margin-top: auto; width: 100%; position: relative; }
 .hud-grid-lines {
     width: 100%;
@@ -204,8 +221,277 @@ body::before {
     transition: all 0.3s;
     pointer-events: all;
     box-shadow: 0 0 8px #00ff41;
+    z-index: 30;
 }
 .hud-button:hover {
     background-color: rgba(0, 255, 65, 0.2);
     box-shadow: 0 0 18px #00ff41;
+}
+/* EXITを右下に固定 */
+.hud-button.hud-exit {
+    left: auto;
+    right: 0;
+}
+/* 小画面で重なり回避 */
+@media (max-width: 640px) {
+  .hud-button { padding: 6px 18px; font-size: 0.95rem; }
+    .hud-sub-readouts { bottom: 110px; right: 100px; font-size: 0.95rem; }
+}
+
+/* レスポンシブ: 小画面では画像を切らずに表示するため contain を使う */
+@media (max-width: 900px) {
+    body {
+        /* 背景画像の高さをビューポートに合わせて常に下まで届かせる（横幅は自動調整） */
+        /* これにより画像の縦方向が常にカバーされ、上下に黒い余白が出にくくなる */
+        background-size: auto 100%, auto;
+        background-position: center center, 0 0;
+        background-attachment: scroll; /* 固定だとモバイルで不自然な場合がある */
+    }
+}
+
+/* タッチデバイスでのパフォーマンス向上: 大画面でもスクロール中にちらつく場合は fixed を解除 */
+@media (hover: none) and (pointer: coarse) {
+    body { background-attachment: scroll; }
+}
+
+#ranking-list {
+    max-height: 400px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+}
+.ranking-row {
+    display: grid;
+    grid-template-columns: 48px 80px 1fr 120px 120px;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0.7em 0.5em;
+    background: #222a33;
+    border-radius: 12px;
+    margin-bottom: 12px;
+    box-shadow: 0 0 16px #00ff4144;
+}
+.ranking-row .ranking-rank {
+    text-align: center;
+    font-size: 2em;
+    font-weight: bold;
+    color: #0ee5b3;
+}
+.ranking-row .ranking-thumb {
+    width: 64px;
+    height: 48px;
+    object-fit: cover;
+    border-radius: 8px;
+    background: #071116;
+    display: block;
+    margin: 0 auto;
+}
+.ranking-row .ranking-name {
+    font-family: 'Orbitron', 'FZGontaKana', sans-serif;
+    font-size: 1.2em;
+    color: #ffe600;
+    text-shadow: 0 0 8px #00ff41;
+}
+.ranking-row .ranking-score {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 1.1em;
+    color: #ffd700;
+    text-align: right;
+}
+.ranking-row .ranking-delete {
+    display: flex;
+    justify-content: center;
+}
+.btn.btn-danger {
+    min-width: 80px;
+    padding: 0.5em 1.2em;
+    font-size: 1em;
+    background: linear-gradient(90deg, #ff4e4e 0%, #ff9900 100%);
+    color: #fff;
+    border-radius: 0.5em;
+    box-shadow: 0 0 8px #ff4e4e44;
+    font-weight: bold;
+    letter-spacing: 0.08em;
+    border: none;
+    transition: all 0.18s cubic-bezier(.4,2,.6,1);
+}
+.btn.btn-danger:hover {
+    background: #ff2222;
+    color: #fff;
+    box-shadow: 0 0 16px #ff4e4e88;
+    transform: scale(1.06);
+}
+.ranking-nav {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    margin-top: 16px;
+}
+.ranking-arrow {
+    font-family:  'FZGontaKana', 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif;
+    background: linear-gradient(90deg, #f9c107 0%, #ff9900 100%);
+    color: #f5f5f5;
+    -webkit-text-stroke: 1px black;
+    border: none;
+    border-radius: 0.5em;
+    box-shadow: 0 0 12px #00ff41, 0 0 32px #0fffc1;
+    font-weight: bold;
+    font-size: 1.2rem;
+    padding: 0.7em 2.2em;
+    letter-spacing: 0.08em;
+    transition: all 0.18s cubic-bezier(.4,2,.6,1);
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+    margin: 0 12px;
+    display: inline-block;
+}
+.ranking-arrow:last-child {
+    margin-right: 0;
+}
+.ranking-arrow:hover {
+    color: #fff;
+    background: #101820;
+    box-shadow: 0 0 24px #00ff41, 0 0 48px #0fffc1;
+    transform: scale(1.06);
+}
+.ranking-arrow:disabled {
+    background: #aaa;
+    color: #eee;
+    cursor: not-allowed;
+    padding: 8px 24px;
+    border-radius: 8px;
+    background: #0078d7;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+}
+.ranking-arrow:disabled {
+    background: #aaa;
+    cursor: not-allowed;
+}
+
+/* ===== バトル画面用CSS ===== */
+.screen-battle.card {
+    border-radius: 24px;
+    box-shadow: 0 0 32px #0f0a;
+    border: 6px solid #0f0;
+    padding: 32px 0 0 0;
+    min-width: 900px;
+    min-height: 700px;
+    max-width: 1200px;
+    margin: 0 auto;
+    position: relative;
+}
+.battle-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 0 80px 16px 80px;
+}
+.battle-label {
+    font-size: 2.5rem;
+    font-weight: bold;
+    text-shadow: 2px 2px 0 #000, 0 0 8px #fff;
+}
+.battle-label-1 { color: #f33; }
+.battle-label-2 { color: #39f; }
+.battle-timer {
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: #fff;
+    text-shadow: 2px 2px 0 #000, 0 0 8px #0f0;
+}
+.battle-gauges {
+    display: flex;
+    justify-content: space-between;
+    margin: 0 80px 24px 80px;
+}
+.battle-gauge-box {
+    width: 320px;
+    background: rgba(0,0,0,0.3);
+    border-radius: 20px;
+    padding: 16px 24px;
+    text-align: center;
+}
+.battle-gauge {
+    height: 18px;
+    background: linear-gradient(90deg,#ff0,#fc0 60%,#ccc 100%);
+    border-radius: 8px;
+    margin-bottom: 4px;
+    transition: width 0.3s;
+}
+.battle-score {
+    font-size: 1.2rem;
+    color: #fff;
+    text-shadow: 1px 1px 0 #000;
+}
+.battle-name {
+    font-size: 1.1rem;
+    color: #fff;
+    margin-top: 2px;
+}
+.battle-main {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 24px 0 0 0;
+}
+.battle-img {
+    width: 220px;
+    height: 220px;
+    object-fit: cover;
+    border-radius: 20px;
+    border: 4px solid #fff;
+    box-shadow: 0 0 16px #000a;
+}
+.battle-center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 0 64px;
+}
+.battle-mouse {
+    width: 180px;
+    height: 180px;
+    margin-bottom: 18px;
+}
+.battle-instruct {
+    font-size: 2.8rem;
+    color: #f33;
+    font-weight: bold;
+    text-shadow: 2px 2px 0 #fff, 0 0 8px #000;
+}
+.battle-exit {
+    position: absolute;
+    right: 48px;
+    bottom: 48px;
+    font-size: 2rem;
+    background: #fc0;
+    color: #222;
+    border-radius: 16px;
+    padding: 12px 48px;
+    font-weight: bold;
+    box-shadow: 0 0 12px #000a;
+}
+.battle-start-btn {
+    font-size: 2.4rem;
+    background: #0cf;
+    color: #fff;
+    border-radius: 20px;
+    padding: 24px 64px;
+    font-weight: bold;
+    margin-bottom: 24px;
+    box-shadow: 0 0 12px #000a;
+    border: none;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.battle-start-btn:hover {
+    background: #09f;
+}
+.hidden {
+    display: none !important;
 }
