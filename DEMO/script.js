@@ -643,7 +643,7 @@ function showMeasurementUI(playerNum) {
         if (!window._measureSocket || window._measureSocket.readyState !== 1) {
             const wsProto = (location.protocol === 'https:') ? 'wss://' : 'ws://';
             const host = location.hostname; // 現在アクセスしているホストを利用
-            const port = 8765; // Nodeサーバーポート
+            const port = (location.port && location.port !== '') ? location.port : '8080'; // Nodeサーバーポート（既定8080）
             window._measureSocket = new WebSocket(`${wsProto}${host}:${port}`);
         }
         let ws = window._measureSocket;
