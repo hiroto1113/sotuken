@@ -3,10 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- ファビコンエラー解決 -->
+    <link rel="icon" type="image/x-icon" href="data:image/x-icon;base64,AAABAAEAEBAQAAEABAAoAQAAFgAAACgAAAAQAAAAIAAAAAEABAAAAAAAgAAAAAAAAAAAAAAAEAAAAAAAAAAA">
     <!-- ★★★ 新しいタイトルとフォント ★★★ -->
     <title>スカウター</title>
-    <!-- Tailwind CDN (temporary restore to recover layout) -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tailwind CSS CDN (本番用設定) -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,typography,aspect-ratio,line-clamp"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        'tech-mono': ['Share Tech Mono', 'monospace'],
+                        'orbitron': ['Orbitron', 'monospace'],
+                        'fzgonta': ['FZGontaKana', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -21,9 +36,15 @@
 </head>
 <body class="bg-gray-900 text-white font-tech-mono antialiased flex items-center justify-center min-h-screen">
     <!-- 効果音 -->
-    <audio id="se-button" src="button.mp3" preload="auto"></audio>
-    <audio id="se-roulette" src="roulette.mp3" preload="auto"></audio>
-    <audio id="se-roulette2" src="roulette2.mp3" preload="auto"></audio>
+    <audio id="se-button" preload="none">
+        <source src="button.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="se-roulette" preload="none">
+        <source src="roulette.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="se-roulette2" preload="none">
+        <source src="roulette2.mp3" type="audio/mpeg">
+    </audio>
     
     <div class="container mx-auto p-4 max-w-5xl w-full">
         <!-- ===== 三種バトル画面 ===== -->
