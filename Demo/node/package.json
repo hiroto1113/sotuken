@@ -9,9 +9,9 @@
     "start:watch": "nodemon server.js"
   },
   "dependencies": {
-    "ws": "^8.18.0",
+    "cors": "^2.8.5",
     "express": "^4.19.2",
-    "cors": "^2.8.5"
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.7"

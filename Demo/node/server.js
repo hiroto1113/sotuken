@@ -6,11 +6,10 @@ const { WebSocketServer } = require('ws');
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
-let https = null; // lazy-load when certs exist
 const express = require('express');
 const cors = require('cors');
 
-const PORT = 8765; // reuse same port for WS + REST
+const PORT = Number(process.env.PORT || 8080); // reuse same port for WS + REST
 const POWER_LOG_CSV = path.join(__dirname, 'power_scan_log.csv');
 const RANKING_CSV = path.join(__dirname, 'ranking.csv');
 const DEMO_ROOT = path.resolve(__dirname, '..');
@@ -226,22 +225,8 @@ app.get('/api/music-list', (_req, res) => {
 
 // --- PHP compatibility endpoints ---
 
-// --- HTTPS(optional) setup ---
-const CERT_DIR = path.join(__dirname, 'certs');
-const KEY_PATH = path.join(CERT_DIR, 'server.key');
-const CERT_PATH = path.join(CERT_DIR, 'server.crt');
-const hasCert = fs.existsSync(KEY_PATH) && fs.existsSync(CERT_PATH);
-
-let server;
-let isHttps = false;
-if (hasCert) {
-  https = require('https');
-  const tlsOptions = { key: fs.readFileSync(KEY_PATH), cert: fs.readFileSync(CERT_PATH) };
-  server = https.createServer(tlsOptions, app);
-  isHttps = true;
-} else {
-  server = http.createServer(app);
-}
+// --- HTTP server (HTTPS 廃止) ---
+const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
 wss.on('connection', (ws) => {
@@ -269,10 +254,8 @@ wss.on('connection', (ws) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  const httpScheme = isHttps ? 'https' : 'http';
-  const wsScheme = isHttps ? 'wss' : 'ws';
-  console.log(`Demo Node server running at ${httpScheme}://0.0.0.0:${PORT} (bind all interfaces)`);
-  console.log(`WS endpoint ${wsScheme}://<your-ip>:${PORT}`);
+  console.log(`Demo Node server running at http://0.0.0.0:${PORT} (bind all interfaces)`);
+  console.log(`WS endpoint ws://<your-ip>:${PORT}`);
   console.log(`Power log: ${POWER_LOG_CSV}`);
   console.log(`Ranking CSV: ${RANKING_CSV}`);
 });
