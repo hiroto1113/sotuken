@@ -3,7 +3,9 @@
 header('Content-Type: application/json');
 // --- データベースファイル名 ---
 $db_file = 'database.sqlite';
+$battle_db_file = 'battle_database.sqlite';
 $is_new_db = !file_exists($db_file);
+$is_new_battle_db = !file_exists($battle_db_file);
 
 try {
     // --- SQLiteデータベースに接続 ---
@@ -11,6 +13,10 @@ try {
     $pdo = new PDO('sqlite:' . $db_file);
     // エラー発生時に例外をスローするように設定
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+    // バトル用データベース接続
+    $battle_pdo = new PDO('sqlite:' . $battle_db_file);
+    $battle_pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
     // --- もしデータベースが新規作成された場合、テーブルを作成する ---
     if ($is_new_db) {
@@ -21,6 +27,25 @@ try {
                 score INTEGER NOT NULL,
                 image TEXT,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        ");
+    }
+
+    // バトル用テーブル作成
+    if ($is_new_battle_db) {
+        $battle_pdo->exec("
+            CREATE TABLE IF NOT EXISTS battle_results (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                player1_name TEXT NOT NULL,
+                player1_score INTEGER NOT NULL,
+                player1_clicks INTEGER NOT NULL,
+                player1_final_score INTEGER NOT NULL,
+                player2_name TEXT NOT NULL,
+                player2_score INTEGER NOT NULL,
+                player2_clicks INTEGER NOT NULL,
+                player2_final_score INTEGER NOT NULL,
+                winner TEXT NOT NULL,
+                battle_date DATETIME DEFAULT CURRENT_TIMESTAMP
             )
         ");
     }
@@ -64,6 +89,18 @@ switch ($action) {
         break;
     case 'get_ranking':
         getRanking($pdo);
+        break;
+    case 'delete_scores':
+        deleteScores($pdo, $post_data);
+        break;
+    case 'clear_all':
+        clearAllScores($pdo);
+        break;
+    case 'save_battle_result':
+        saveBattleResult($battle_pdo, $post_data);
+        break;
+    case 'get_battle_ranking':
+        getBattleRanking($battle_pdo);
         break;
     default:
         http_response_code(400); // Bad Request
@@ -153,7 +190,7 @@ function saveScore($pdo, $data) {
  */
 function getRanking($pdo) {
     // スコアの高い順に上位10件を取得
-    $sql = "SELECT name, score, image FROM ranking ORDER BY score DESC LIMIT 10";
+    $sql = "SELECT id, name, score, image FROM ranking ORDER BY score DESC LIMIT 20";
     $stmt = $pdo->prepare($sql);
     $stmt->execute();
     
@@ -161,5 +198,112 @@ function getRanking($pdo) {
     $ranking = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     echo json_encode($ranking);
+}
+
+/**
+ * 選択されたスコアを削除する関数
+ */
+function deleteScores($pdo, $data) {
+    if (empty($data->ids) || !is_array($data->ids)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => '削除対象のIDがありません。']);
+        return;
+    }
+    
+    try {
+        $placeholders = str_repeat('?,', count($data->ids) - 1) . '?';
+        $sql = "DELETE FROM ranking WHERE id IN ($placeholders)";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($data->ids);
+        
+        echo json_encode(['success' => true, 'message' => '選択されたデータを削除しました。']);
+    } catch (PDOException $e) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => '削除に失敗しました。']);
+    }
+}
+
+/**
+ * すべてのスコアを削除する関数
+ */
+function clearAllScores($pdo) {
+    try {
+        $sql = "DELETE FROM ranking";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute();
+        
+        echo json_encode(['success' => true, 'message' => 'すべてのデータを削除しました。']);
+    } catch (PDOException $e) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => '削除に失敗しました。']);
+    }
+}
+
+/**
+ * バトル結果をデータベースに保存する関数
+ */
+function saveBattleResult($battle_pdo, $data) {
+    if (empty($data->player1_name) || empty($data->player2_name) || 
+        !isset($data->player1_score) || !isset($data->player2_score) ||
+        !isset($data->player1_clicks) || !isset($data->player2_clicks) ||
+        !isset($data->player1_final_score) || !isset($data->player2_final_score) ||
+        empty($data->winner)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'バトルデータが不完全です。']);
+        return;
+    }
+
+    try {
+        $sql = "INSERT INTO battle_results (
+            player1_name, player1_score, player1_clicks, player1_final_score,
+            player2_name, player2_score, player2_clicks, player2_final_score,
+            winner
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        
+        $stmt = $battle_pdo->prepare($sql);
+        $stmt->execute([
+            $data->player1_name,
+            $data->player1_score,
+            $data->player1_clicks,
+            $data->player1_final_score,
+            $data->player2_name,
+            $data->player2_score,
+            $data->player2_clicks,
+            $data->player2_final_score,
+            $data->winner
+        ]);
+        
+        echo json_encode(['success' => true, 'message' => 'バトル結果を保存しました。']);
+    } catch (PDOException $e) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'バトル結果の保存に失敗しました: ' . $e->getMessage()]);
+    }
+}
+
+/**
+ * バトルランキングを取得する関数
+ */
+function getBattleRanking($battle_pdo) {
+    try {
+        // 勝利数でランキングを作成（勝者名でグループ化）
+        $sql = "
+            SELECT 
+                winner as name,
+                COUNT(*) as wins,
+                MAX(battle_date) as latest_battle
+            FROM battle_results 
+            WHERE winner != '引き分け'
+            GROUP BY winner 
+            ORDER BY wins DESC, latest_battle DESC
+            LIMIT 50
+        ";
+        $stmt = $battle_pdo->query($sql);
+        $ranking = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        echo json_encode($ranking);
+    } catch (PDOException $e) {
+        http_response_code(500);
+        echo json_encode(['error' => 'バトルランキングの取得に失敗しました: ' . $e->getMessage()]);
+    }
 }
 ?>
