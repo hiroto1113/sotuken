@@ -4,14 +4,14 @@ const rankingListEl = document.getElementById('ranking-list');
 
 async function fetchAndShowRanking() {
 	if (!rankingListEl) return;
-	rankingListEl.innerHTML = '<div class="text-center text-gray-400">ろーでぃんぐ...</div>';
+	rankingListEl.innerHTML = '<div class="text-center text-gray-400">ローディング...</div>';
 	try {
 		const res = await fetch('/api/get_ranking');
 		const data = await res.json();
 		const rankingData = Array.isArray(data) ? data : [];
 		renderRanking(rankingData);
 	} catch (e) {
-		rankingListEl.innerHTML = '<div class="text-center text-red-400">らんきんぐ しっぱい</div>';
+		rankingListEl.innerHTML = '<div class="text-center text-red-400">ランキング 失敗</div>';
 	}
 }
 
@@ -47,7 +47,7 @@ function escapeHtml(s) {
 }
 
 async function deleteRankingEntry(id) {
-	if (!confirm('このデータ を けす？ なまえ と え が きえるよ。')) return;
+	if (!confirm('このデータ を 消す？ 名前 と 画像 が 消えるよ。')) return;
 	try {
 		const res = await fetch('/api/delete_score', {
 			method: 'POST',
@@ -58,10 +58,10 @@ async function deleteRankingEntry(id) {
 		if (json && json.success) {
 			await fetchAndShowRanking();
 		} else {
-			alert('さくじょ に しっぱい');
+			alert('削除 に 失敗しました');
 		}
 	} catch (e) {
-		alert('さくじょ えらー');
+		alert('削除 エラー');
 	}
 }
 

@@ -380,9 +380,9 @@ function showBattleResult({ p1, p2 }) {
     if (p2ScoreEl) p2ScoreEl.textContent = (p2.score || 0).toLocaleString();
 
     let msg = '';
-    if ((p1.score || 0) > (p2.score || 0)) msg = `しょうしゃ: ${p1.name}`;
-    else if ((p1.score || 0) < (p2.score || 0)) msg = `しょうしゃ: ${p2.name}`;
-    else msg = 'ひきわけ！';
+    if ((p1.score || 0) > (p2.score || 0)) msg = `Winner: ${p1.name}`;
+    else if ((p1.score || 0) < (p2.score || 0)) msg = `Winner ${p2.name}`;
+    else msg = 'Drrow！';
     if (winnerEl) winnerEl.textContent = msg;
 
     showScreen('battle-result');
@@ -539,7 +539,7 @@ async function fetchAndShowRanking() {
     }, 100);
     const rankingList = document.getElementById('ranking-list');
     if (!rankingList) return;
-    rankingList.innerHTML = '<div class="text-center text-gray-400">ろーでぃんぐ...</div>';
+    rankingList.innerHTML = '<div class="text-center text-gray-400">ローディング...</div>';
     try {
     const res = await fetch('/api/get_ranking');
         const data = await res.json();
@@ -547,7 +547,7 @@ async function fetchAndShowRanking() {
         rankingPage = 0;
         renderRankingPage();
     } catch (e) {
-        rankingList.innerHTML = '<div class="text-center text-red-400">らんきんぐ しっぱい</div>';
+        rankingList.innerHTML = '<div class="text-center text-red-400">ランキング 失敗</div>';
     }
 }
 
