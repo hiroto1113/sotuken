@@ -1,4 +1,5 @@
 // measurement page logic (camera, pose, compute stats, save, 2p flow)
+import { ensurePoseLoaded, createPose } from './mediapipe.js';
 
 // DOM
 const videoEl = document.getElementById('input-video');
@@ -37,19 +38,6 @@ function getQueryParams() {
     return q;
 }
 
-// simple script loader with timeout
-function loadScript(url) {
-    return new Promise((resolve, reject) => {
-        const s = document.createElement('script');
-        s.src = url;
-        s.onload = () => resolve();
-        s.onerror = () => reject(new Error('Failed to load ' + url));
-        document.head.appendChild(s);
-    });
-}
-function withTimeout(promise, ms) {
-    return Promise.race([promise, new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')), ms))]);
-}
 
 // minimal POWER constants (copied/compatible)
 const POWER_CONSTANTS = {
@@ -191,41 +179,14 @@ function updateStats(stats) {
     try { statPose.textContent = stats.pose ? stats.pose.toFixed(2) : '-'; } catch(e){}
 }
 
-async function ensurePoseLoaded() {
-    if (window.Pose || (window.pose && window.pose.Pose)) return true;
-    const urls = [
-        'mediapipe/pose/pose.js',
-        'pose.js',
-        'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469242/pose.js',
-        'https://unpkg.com/@mediapipe/pose@0.5.1675469242/pose.js'
-    ];
-    for (const u of urls) {
-        try {
-            if (socketStatus) { socketStatus.textContent = 'LOADING POSE...'; }
-            await withTimeout(loadScript(u), 8000);
-        } catch(_) { continue; }
-        if (window.Pose || (window.pose && window.pose.Pose)) return true;
-    }
-    if (socketStatus) { socketStatus.textContent = 'POSE NOT FOUND'; }
-    return false;
-}
-
 async function initPose() {
     if (pose) return true;
-    const ok = await ensurePoseLoaded();
+    const ok = await ensurePoseLoaded(socketStatus);
     if (!ok) return false;
-    const PoseClass = window.Pose || (window.pose && window.pose.Pose);
-    const base = (window._mpPoseBase !== undefined) ? window._mpPoseBase : 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469242/';
-    pose = new PoseClass({ locateFile: (file) => `${base}${file}` });
-    pose.setOptions({
-        selfieMode: true,
-        modelComplexity: 1,
-        smoothLandmarks: true,
-        enableSegmentation: false,
-        minDetectionConfidence: 0.5,
-        minTrackingConfidence: 0.5
-    });
-    pose.onResults((results) => {
+    const base = (window._mpPoseBase !== undefined) ? window._mpPoseBase : 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/';
+    pose = await createPose({
+        base,
+        onResults: (results) => {
         if (results && results.poseLandmarks) {
             const stats = computeCombatStatsFromLandmarks(results.poseLandmarks);
             updateStats(stats);
@@ -240,6 +201,7 @@ async function initPose() {
                 ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
             }
         } catch(e){}
+        }
     });
     return true;
 }

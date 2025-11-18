@@ -9,6 +9,7 @@
     "start:watch": "nodemon server.js"
   },
   "dependencies": {
+    "@mediapipe/pose": "^0.5.1675469404",
     "cors": "^2.8.5",
     "express": "^4.19.2",
     "ws": "^8.18.0"
