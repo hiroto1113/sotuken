@@ -711,7 +711,10 @@ let battleState = {
         instructions: document.getElementById('screen-instructions'),
         gender: document.getElementById('screen-gender'),
         measurement: document.getElementById('screen-measurement'),
-        ranking: document.getElementById('screen-ranking')
+        ranking: document.getElementById('screen-ranking'),
+        // 追加: バトル画面 & 結果画面を取得しておく（index.html に統合したため必要）
+        battle: document.getElementById('screen-battle'),
+        battleResult: document.getElementById('screen-battle-result')
     };
     
     // 主要なボタン要素（主に古いコードや、addEventListener で設定し直す前のもの）
