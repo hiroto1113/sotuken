@@ -1,9 +1,6 @@
 // measurement page logic (camera, pose, compute stats, save, 2p flow)
-<<<<<<< HEAD
-import { ensurePoseLoaded, createPose } from './mediapipe.js';
-=======
 // (このファイルは measurement.html 専用のスクリプトです)
->>>>>>> 1313f5571b149a2c18ccbc779218619297ba96af
+import { ensurePoseLoaded, createPose } from './mediapipe.js';
 
 // --- DOM要素の取得 ---
 const videoEl = document.getElementById('input-video'); // カメラ映像を表示する <video>
@@ -11,9 +8,7 @@ const canvasEl = document.getElementById('output-canvas'); // 映像を描画・
 const socketStatus = document.getElementById('socket-status'); // 状態表示用 (LOADING POSE... など)
 const totalPowerEl = document.getElementById('total-power'); // 総合戦闘力
 const basePowerEl = document.getElementById('base-power'); // 基礎戦闘力
-const poseBonusEl = document.getElementById('pose-bonus'); // ポーズボーナス
-const exprBonusEl = document.getElementById('expression-bonus'); // 表情ボーナス
-const speedBonusEl = document.getElementById('speed-bonus'); // 速度ボーナス
+// ポーズ/表情/速度ボーナスの個別表示は不要になったため削除
 const statHeight = document.getElementById('stat-height'); // 身長 (推定値)
 const statReach = document.getElementById('stat-reach'); // リーチ (推定値)
 const statShoulder = document.getElementById('stat-shoulder'); // 肩幅 (推定値)
@@ -48,64 +43,33 @@ function getQueryParams() {
     return q;
 }
 
-<<<<<<< HEAD
-=======
-/**
- * scriptタグを動的に読み込む (Promise版)
- * @param {string} url - 読み込むスクリプトのURL
- * @returns {Promise} 読み込み成功/失敗を返すPromise
- */
-function loadScript(url) {
-    return new Promise((resolve, reject) => {
-        const s = document.createElement('script');
-        s.src = url;
-        s.onload = () => resolve(); // 読み込み成功
-        s.onerror = () => reject(new Error('Failed to load ' + url)); // 読み込み失敗
-        document.head.appendChild(s);
-    });
-}
-/**
- * Promiseにタイムアウトを設定する
- * @param {Promise} promise - 対象のPromise
- * @param {number} ms - タイムアウト時間 (ミリ秒)
- * @returns {Promise} タイムアウト付きのPromise
- */
-function withTimeout(promise, ms) {
-    // Promise.race: 複数のPromiseのうち、最初に完了したものだけを採用する
-    return Promise.race([
-        promise, // 元のPromise
-        new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')), ms)) // タイムアウト用Promise
-    ]);
-}
->>>>>>> 1313f5571b149a2c18ccbc779218619297ba96af
+// (旧バージョンの動的読み込みロジックは mediapipe.js へ集約済み)
 
 // --- 戦闘力計算 ---
 
 // 戦闘力計算用の定数 (script.js と互換性のある最小限のコピー)
+// 速度要素を排除し、重みの重複を軽減した簡略版定数
 const POWER_CONSTANTS = {
-    baseline: 100000, // 基礎点
-    maxTotal: 500000, // 最大値
-    clipFeature: 1.6, // 身体特徴の最大値（身長比）
-    clipSpeed: 2.0, // 速度の最大値
-    weightBase: 0.60, // 基礎戦闘力（体格）の重み
-    weightStyle: 0.25, // スタイル（ポーズ・表情）の重み
-    weightMotion: 0.15, // 動作（速度）の重み
-    weightPoseInStyle: 0.60, // スタイル内のポーズの重み
-    weightExprInStyle: 0.40, // スタイル内の表情の重み
-    weightReachInBase: 0.40, // 基礎内のリーチの重み
-    weightShoulderInBase: 0.35, // 基礎内の肩幅の重み
-    weightLegInBase: 0.25, // 基礎内の脚の長さの重み
-    genderMultiplier: { male: 1.00, female: 1.09 }, // 性別補正（女性の場合少し高めに出る）
-    speedAlpha: 0.4 // 速度の平滑化係数 (EMA)
+    baseline: 100000,
+    maxTotal: 500000,
+    clipFeature: 1.6,
+    // 速度(weightMotion) を除いたため Base+Style が1になるよう再正規化
+    weightBase: 0.70,
+    weightStyle: 0.30,
+    // スタイル内部の比率・基礎内部の比率は既存維持
+    weightPoseInStyle: 0.60,
+    weightExprInStyle: 0.40,
+    weightReachInBase: 0.40,
+    weightShoulderInBase: 0.35,
+    weightLegInBase: 0.25,
+    genderMultiplier: { male: 1.00, female: 1.09 }
 };
 
 // --- MediaPipe Pose 関連 ---
 let pose = null; // MediaPipe Pose のインスタンス
 let videoRenderRAF = null; // requestAnimationFrame ID (ビデオ描画用)
 let poseRenderRAF = null; // requestAnimationFrame ID (ポーズ推定ループ用)
-let _prevForSpeed = null; // 速度計算用の前フレームのランドマーク
-let _prevTimeMs = null; // 速度計算用の前フレームの時間
-let _speedEma = 0; // 平滑化された速度
+// 速度関連の変数は削除 (_prevForSpeed, _prevTimeMs, _speedEma)
 
 /**
  * MediaPipeのランドマークから戦闘力を計算するコア関数
@@ -114,12 +78,12 @@ let _speedEma = 0; // 平滑化された速度
  */
 function computeCombatStatsFromLandmarks(lm) {
     // ランドマークが取得できていない場合は、基礎点のみを返す
-    if (!lm || lm.length < 33) {
-        return {
-            base_power: 0, pose_bonus: 0, expression_bonus: 0, speed_bonus: 0, total_power: POWER_CONSTANTS.baseline,
-            height: 0, reach: 0, shoulder: 0, expression: 0, pose: 0
-        };
-    }
+    if (!lm || lm.length < 33) {
+        return {
+            base_power: 0, pose_bonus: 0, expression_bonus: 0, total_power: POWER_CONSTANTS.baseline,
+            height: 0, reach: 0, shoulder: 0, expression: 0, pose: 0
+        };
+    }
 
     // --- ユーティリティ関数 (計算用) ---
     const v2 = (a, b) => Math.hypot((a.x - b.x), (a.y - b.y)); // 2点間の距離
@@ -164,25 +128,7 @@ function computeCombatStatsFromLandmarks(lm) {
     const face = lm.slice(0, 5).map(p => [p.x, p.y]).flat(); // 顔の主要5点の座標
     const exprN = clip01(std(face) / 0.05); // 表情値（顔の標準偏差 = 顔の動き）
 
-    // --- 3. 動作 (Motion) の計算 ---
-    const now = performance && performance.now ? performance.now() : Date.now();
-    let vRaw = 0; // 生の速度
-    if (_prevForSpeed && _prevTimeMs) { // 2フレーム目以降
-        const dt = Math.max(1, now - _prevTimeMs) / 1000; // 経過時間 (秒)
-        // 主要な関節のインデックス
-        const idx = [0,11,12,13,14,15,16,23,24,25,26,27,28];
-        // 各関節の前フレームからの移動距離
-        const dists = idx.map(i => v2(lm[i], _prevForSpeed[i] || lm[i]));
-        const avg = mean(dists); // 平均移動距離
-        vRaw = avg / (h * dt); // 速度（身長比・時間あたり）
-    }
-    // 現在の値を次フレームのために保存
-    _prevForSpeed = lm.map(p => ({ x: p.x, y: p.y }));
-    _prevTimeMs = now;
-    const vClip = POWER_CONSTANTS.clipSpeed;
-    const vN = clip01(vRaw / vClip); // 正規化速度
-    // EMA（指数移動平均）で速度を平滑化（急激な変動を抑える）
-    _speedEma = POWER_CONSTANTS.speedAlpha * vN + (1 - POWER_CONSTANTS.speedAlpha) * _speedEma;
+    // 速度(Motion)計算は削除
 
     // --- 4. 総合戦闘力の計算 ---
     // 各要素を重み付けして合算 (0〜1)
@@ -195,13 +141,10 @@ function computeCombatStatsFromLandmarks(lm) {
         POWER_CONSTANTS.weightPoseInStyle * poseN +
         POWER_CONSTANTS.weightExprInStyle * exprN
     );
-    const motionRaw = _speedEma; // 動作
-
-    let combined = ( // 総合値
-        POWER_CONSTANTS.weightBase * baseRaw +
-        POWER_CONSTANTS.weightStyle * styleRaw +
-        POWER_CONSTANTS.weightMotion * motionRaw
-    );
+    let combined = (
+        POWER_CONSTANTS.weightBase * baseRaw +
+        POWER_CONSTANTS.weightStyle * styleRaw
+    );
 
     // 性別補正 (index.html側で設定された _selectedGender を参照)
     let gender = (window && window._selectedGender) ? window._selectedGender : 'male';
@@ -212,17 +155,16 @@ function computeCombatStatsFromLandmarks(lm) {
     const span = POWER_CONSTANTS.maxTotal - POWER_CONSTANTS.baseline;
     // 各ボーナス項目を計算
     let base_amount = span * POWER_CONSTANTS.weightBase * baseRaw;
-    let pose_amount = span * POWER_CONSTANTS.weightStyle * POWER_CONSTANTS.weightPoseInStyle * poseN;
-    let expr_amount = span * POWER_CONSTANTS.weightStyle * POWER_CONSTANTS.weightExprInStyle * exprN;
-    let speed_amount = span * POWER_CONSTANTS.weightMotion * motionRaw;
+    let pose_amount = span * POWER_CONSTANTS.weightStyle * POWER_CONSTANTS.weightPoseInStyle * poseN;
+    let expr_amount = span * POWER_CONSTANTS.weightStyle * POWER_CONSTANTS.weightExprInStyle * exprN;
     
     // 性別補正を各項目にも適用
-    base_amount *= gmul; pose_amount *= gmul; expr_amount *= gmul; speed_amount *= gmul;
+    base_amount *= gmul; pose_amount *= gmul; expr_amount *= gmul;
     
-    let sumParts = base_amount + pose_amount + expr_amount + speed_amount;
+    let sumParts = base_amount + pose_amount + expr_amount;
     if (sumParts > span) { // 合計が上乗せ分を超えた場合、スケールダウンする
         const scale = span / sumParts;
-        base_amount *= scale; pose_amount *= scale; expr_amount *= scale; speed_amount *= scale;
+    base_amount *= scale; pose_amount *= scale; expr_amount *= scale;
         sumParts = span;
     }
     // 基礎点 + 上乗せ分 = 最終戦闘力
@@ -233,7 +175,7 @@ function computeCombatStatsFromLandmarks(lm) {
         base_power: Math.round(base_amount),
         pose_bonus: Math.round(pose_amount),
         expression_bonus: Math.round(expr_amount),
-        speed_bonus: Math.round(speed_amount),
+    // speed_bonus 削除
         total_power: total,
         height, reach, shoulder, expression: exprN, pose: poseN // 生データ（デバッグ表示用）
     };
@@ -244,22 +186,17 @@ function computeCombatStatsFromLandmarks(lm) {
  * @param {object} stats - computeCombatStatsFromLandmarks が返したオブジェクト
  */
 function updateStats(stats) {
-    lastCombatStats = stats; // 常に最新の戦闘力をグローバル変数に保持
-    // toLocaleString() で3桁区切りカンマを入れる
-    try { totalPowerEl.textContent = stats.total_power.toLocaleString(); } catch(e){}
-    try { basePowerEl.textContent = stats.base_power.toLocaleString(); } catch(e){}
-    try { poseBonusEl.textContent = `+${stats.pose_bonus.toLocaleString()}`; } catch(e){}
-    try { exprBonusEl.textContent = `+${stats.expression_bonus.toLocaleString()}`; } catch(e){}
-    try { speedBonusEl.textContent = `+${stats.speed_bonus.toLocaleString()}`; } catch(e){}
-    // toFixed(2) で小数点以下2桁表示
-    try { statHeight.textContent = stats.height ? stats.height.toFixed(2) : '-'; } catch(e){}
-    try { statReach.textContent = stats.reach ? stats.reach.toFixed(2) : '-'; } catch(e){}
-    try { statShoulder.textContent = stats.shoulder ? stats.shoulder.toFixed(2) : '-'; } catch(e){}
-    try { statExpression.textContent = stats.expression ? stats.expression.toFixed(2) : '-'; } catch(e){}
-    try { statPose.textContent = stats.pose ? stats.pose.toFixed(2) : '-'; } catch(e){}
+    lastCombatStats = stats;
+    try { totalPowerEl.textContent = stats.total_power.toLocaleString(); } catch(e){}
+    try { basePowerEl.textContent = stats.base_power.toLocaleString(); } catch(e){}
+    // ボーナス詳細は非表示要求により更新処理を省略
+    try { statHeight.textContent = stats.height ? stats.height.toFixed(2) : '-'; } catch(e){}
+    try { statReach.textContent = stats.reach ? stats.reach.toFixed(2) : '-'; } catch(e){}
+    try { statShoulder.textContent = stats.shoulder ? stats.shoulder.toFixed(2) : '-'; } catch(e){}
+    try { statExpression.textContent = stats.expression ? stats.expression.toFixed(2) : '-'; } catch(e){}
+    try { statPose.textContent = stats.pose ? stats.pose.toFixed(2) : '-'; } catch(e){}
 }
 
-<<<<<<< HEAD
 async function initPose() {
     if (pose) return true;
     const ok = await ensurePoseLoaded(socketStatus);
@@ -285,89 +222,6 @@ async function initPose() {
         }
     });
     return true;
-=======
-/**
- * MediaPipe Pose ライブラリが読み込まれているか確認し、なければ読み込む
- * 複数のURL（ローカルパス、CDN）をフォールバックしながら試行する
- */
-async function ensurePoseLoaded() {
-    // 既に読み込まれていれば true
-    if (window.Pose || (window.pose && window.pose.Pose)) return true;
-
-    // 試行するURLリスト
-    const urls = [
-        'mediapipe/pose/pose.js', // ローカルパス1
-        'pose.js', // ローカルパス2
-        'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469242/pose.js', // CDN1
-        'https://unpkg.com/@mediapipe/pose@0.5.1675469242/pose.js' // CDN2
-    ];
-
-    for (const u of urls) { // リストを順番に試行
-        try {
-            if (socketStatus) { socketStatus.textContent = 'LOADING POSE...'; }
-            // 8秒のタイムアウト付きでスクリプト読み込み
-            await withTimeout(loadScript(u), 8000);
-        } catch(_) { 
-            continue; // 失敗したら次のURLへ
-        }
-        // 読み込み成功後、グローバルに Pose が定義されたか確認
-        if (window.Pose || (window.pose && window.pose.Pose)) return true;
-    }
-
-    // すべてのURLで失敗した場合
-    if (socketStatus) { socketStatus.textContent = 'POSE NOT FOUND'; }
-    return false;
-}
-
-/**
- * MediaPipe Pose のインスタンスを初期化する
- */
-async function initPose() {
-    if (pose) return true; // 既に初期化済み
-    const ok = await ensurePoseLoaded(); // ライブラリ読み込み確認
-    if (!ok) return false; // 読み込み失敗
-
-    const PoseClass = window.Pose || (window.pose && window.pose.Pose); // グローバルからPoseクラスを取得
-    // .wasm などの関連ファイルの読み込みパスを設定
-    const base = (window._mpPoseBase !== undefined) ? window._mpPoseBase : 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469242/';
-    
-    pose = new PoseClass({ locateFile: (file) => `${base}${file}` });
-    
-    // MediaPipe Pose のオプション設定
-    pose.setOptions({
-        selfieMode: true, // 左右反転モード (自撮り風)
-        modelComplexity: 1, // モデルの複雑さ (0: fast, 1: default, 2: heavy)
-        smoothLandmarks: true, // ランドマークを平滑化
-        enableSegmentation: false, // セグメンテーション（背景除去）は不要
-        minDetectionConfidence: 0.5, // 検出の信頼度しきい値
-        minTrackingConfidence: 0.5 // 追跡の信頼度しきい値
-    });
-
-    // ポーズ推定結果が返ってきたときのコールバック
-    pose.onResults((results) => {
-        // ランドマークが取得できた場合
-        if (results && results.poseLandmarks) {
-            // 戦闘力を計算
-            const stats = computeCombatStatsFromLandmarks(results.poseLandmarks);
-            // UIを更新
-            updateStats(stats);
-        }
-
-        // ポーズ推定結果に関わらず、カメラ映像をCanvasに描画する
-        try {
-            const ctx = canvasEl.getContext('2d');
-            ctx.clearRect(0,0,canvasEl.width,canvasEl.height); // キャンバスをクリア
-            if (videoEl && videoEl.videoWidth) {
-                // ビデオの解像度にCanvasの解像度を合わせる
-                if (canvasEl.width !== videoEl.videoWidth) canvasEl.width = videoEl.videoWidth;
-                if (canvasEl.height !== videoEl.videoHeight) canvasEl.height = videoEl.videoHeight;
-                // ビデオ映像をCanvasに描画 (これがスナップショットの元になる)
-                ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
-            }
-        } catch(e){}
-    });
-    return true;
->>>>>>> 1313f5571b149a2c18ccbc779218619297ba96af
 }
 
 /**
