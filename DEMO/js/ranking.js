@@ -68,7 +68,10 @@ async function deleteRankingEntry(id) {
 // インライン onclick 用に公開
 try { window.deleteRankingEntry = deleteRankingEntry; } catch(e) {}
 
-// DOM 準備ができたら読み込み
+// グローバル公開: 他スクリプト（script.js 等）から呼べるようにする
+try { window.fetchAndShowRanking = fetchAndShowRanking; } catch(e) {}
+
+// DOM 準備ができたら読み込み（ranking.html 単体で読み込まれたときの自動表示）
 window.addEventListener('DOMContentLoaded', () => {
 	fetchAndShowRanking();
 });

@@ -28,7 +28,7 @@
             <div class="flex flex-col md:flex-row gap-6 justify-center">
                 <button id="btn-goto-instructions" class="btn">スタート</button>
                 <a href="ranking.html" class="btn btn-secondary">ランキング</a>
-                <button id="btn-goto-2pmeasure" class="btn btn-accent">バトル</button>
+                <a href="battle.html" class="btn btn-accent">バトル</a>
             </div>
 
             <div class="mt-6 flex items-center justify-center gap-3 text-sm text-gray-300">
@@ -41,36 +41,7 @@
             </div>
         </div>
 
-        <div id="screen-2pmeasure" class="screen hidden card space-y-6">
-            <h2 class="text-3xl font-bold text-center font-orbitron">  </h2>
-            <div id="2pmeasure-stage" class="text-center text-xl text-cyan-300">１人目 START
-                <button id="btn-2pmeasure-start" class="btn">START</button>
-                <button id="btn-2pmeasure-next" class="btn btn-accent hidden">２人目へ</button>
-                <button id="btn-2pmeasure-battle" class="btn btn-accent hidden">バトル！</button>
-                <button id="btn-2pmeasure-exit" class="btn btn-secondary">やめる</button>
-            </div>
-        </div>
-
-        <div id="screen-battle-result" class="screen hidden card space-y-6">
-            <h2 class="text-3xl font-bold text-center font-orbitron">バトル　リザルト</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-center">
-                <div class="p-4 bg-gray-800 rounded">
-                    <div class="text-gray-400 text-sm">PLAYER 1</div>
-                    <div id="battle-p1-name" class="text-2xl font-orbitron">PLAYER1</div>
-                    <div id="battle-p1-score" class="text-3xl text-yellow-300 font-mono">0</div>
-                </div>
-                <div class="p-4 bg-gray-800 rounded">
-                    <div class="text-gray-400 text-sm">PLAYER 2</div>
-                    <div id="battle-p2-name" class="text-2xl font-orbitron">PLAYER2</div>
-                    <div id="battle-p2-score" class="text-3xl text-yellow-300 font-mono">0</div>
-                </div>
-            </div>
-            <div id="battle-winner-text" class="text-center text-2xl text-cyan-300 font-orbitron">対戦結果</div>
-            <div class="flex gap-4 justify-center pt-2">
-                <button id="btn-battle-rematch" class="btn">再挑戦</button>
-                <button id="btn-battle-back" class="btn btn-secondary">タイトルへ</button>
-            </div>
-        </div>
+        <!-- バトル画面は battle.html に分離しました -->
 
         <div id="screen-instructions" class="screen hidden card space-y-6">
             <h2 class="text-3xl font-bold text-center font-orbitron">experience</h2>
@@ -107,6 +78,7 @@
 		
 	<!-- measurement HTML は別ファイルへ分離しました -->
 	
-    </div> <script src="script.js" type="module" defer></script>
+    </div> 
+    <script src="script.js" type="module" defer></script>
 </body>
 </html>

@@ -415,3 +415,16 @@ window.addEventListener('DOMContentLoaded', async () => {
     await openCamera();
     await startPoseLoop();
 });
+
+// --- 公開: script.js など他スクリプトから呼べるようにする（重複回避のためのエクスポート） ---
+try { window.computeCombatStatsFromLandmarks = computeCombatStatsFromLandmarks; } catch(e){}
+try { window.updateStats = updateStats; } catch(e){}
+try { window.ensurePoseLoaded = ensurePoseLoaded; } catch(e){}
+try { window.initPose = initPose; } catch(e){}
+try { window.openCamera = openCamera; } catch(e){}
+try { window.startPoseLoop = startPoseLoop; } catch(e){}
+try { window.stopMeasurement = stopAll; } catch(e){}            // エイリアス名 (script.js からの呼び出しを想定)
+try { window.stopAll = stopAll; } catch(e){}                    // 既存名も公開
+try { window.saveResultToDB = saveResultToDB; } catch(e){}
+// 測定ページ単体で start/stop を呼びたい場合の簡易公開
+try { window.startMeasurementPage = async function(playerNum){ await openCamera(); await startPoseLoop(); }; } catch(e){}

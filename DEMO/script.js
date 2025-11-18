@@ -16,27 +16,27 @@ function showScreen(screenName) {
 }
 
 // ランキング削除（インラインonclick対応）
-async function deleteRankingEntry(id) {
-    if (!confirm('このデータ を けす？ なまえ と え が きえるよ。')) return;
-    try {
-        const res = await fetch('/api/delete_score', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id })
-        });
-        const json = await res.json();
-        if (json && json.success) {
-            await fetchAndShowRanking();
-        } else {
-            alert('さくじょ に しっぱい');
-        }
-    } catch (e) {
-        alert('さくじょ えらー');
-    }
+// ranking.js が提供すればそちらを優先。未提供時は簡易フォールバック（最小実装）
+if (typeof window !== 'undefined' && typeof window.deleteRankingEntry !== 'function') {
+	try {
+		window.deleteRankingEntry = function(id) {
+			if (!confirm('このデータ を けす？ なまえ と え が きえるよ。')) return;
+			fetch('/api/delete_score', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ id })
+			})
+			.then(() => {
+				if (typeof window.fetchAndShowRanking === 'function') {
+					window.fetchAndShowRanking();
+				} else {
+					location.reload();
+				}
+			})
+			.catch(() => alert('さくじょ えらー'));
+		};
+	} catch(e){}
 }
-try { window.deleteRankingEntry = deleteRankingEntry; } catch(e) {}
-// expose to global so inline onclick works when this file is loaded as module
-try { window.deleteRankingEntry = deleteRankingEntry; } catch(e) {}
 
 // 初期画面表示とボタンイベント再バインド
 window.addEventListener('DOMContentLoaded', () => {
@@ -300,7 +300,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnGotoRanking) {
         btnGotoRanking.addEventListener('click', async () => {
             showScreen('ranking');
-            await fetchAndShowRanking();
+            // 外部実装があれば呼び出す（ranking.js が提供）
+            if (typeof window !== 'undefined' && typeof window.fetchAndShowRanking === 'function') {
+                await window.fetchAndShowRanking();
+            } else {
+                await fetchAndShowRankingFallback();
+            }
         });
     }
     // ランキング画面の戻るボタン
@@ -510,117 +515,50 @@ function initSfxFallback() {
         // ネットワークエラー時は何もしない（既定のsfx/パスで動作）
     });
 }
-// ランキング取得＆表示
-let rankingData = [];
-let rankingPage = 0;
-const RANKING_PAGE_SIZE = 5;
 
-async function fetchAndShowRanking() {
-    // 矢印ボタンのイベントを毎回再バインド
-    setTimeout(() => {
-        const btnPrev = document.getElementById('ranking-prev');
-        const btnNext = document.getElementById('ranking-next');
-        if (btnPrev) {
-            btnPrev.onclick = () => {
-                if (rankingPage > 0) {
-                    rankingPage--;
-                    renderRankingPage();
-                }
-            };
-        }
-        if (btnNext) {
-            btnNext.onclick = () => {
-                if ((rankingPage + 1) * RANKING_PAGE_SIZE < rankingData.length) {
-                    rankingPage++;
-                    renderRankingPage();
-                }
-            };
-        }
-    }, 100);
-    const rankingList = document.getElementById('ranking-list');
-    if (!rankingList) return;
-    rankingList.innerHTML = '<div class="text-center text-gray-400">ローディング...</div>';
-    try {
-    const res = await fetch('/api/get_ranking');
-        const data = await res.json();
-        rankingData = Array.isArray(data) ? data : [];
-        rankingPage = 0;
-        renderRankingPage();
-    } catch (e) {
-        rankingList.innerHTML = '<div class="text-center text-red-400">ランキング 失敗</div>';
-    }
+// ---- ランキング機能は外部ファイル (js/ranking.js) に委譲します ----
+// ここでは外部の fetchAndShowRanking を呼ぶフォールバックだけを用意。
+async function fetchAndShowRankingFallback() {
+	// ranking.js が読み込まれていればそれを呼ぶ
+	if (typeof window !== 'undefined' && typeof window.fetchAndShowRanking === 'function') {
+		return window.fetchAndShowRanking();
+	}
+	// ない場合はランキング領域にメッセージ
+	const rankingList = document.getElementById('ranking-list');
+	if (rankingList) rankingList.innerHTML = '<div class="text-center text-gray-400">ランキング機能は利用できません</div>';
 }
 
-function renderRankingPage() {
-    const rankingList = document.getElementById('ranking-list');
-    if (!rankingList) return;
-    const btnPrev = document.getElementById('ranking-prev');
-    const btnNext = document.getElementById('ranking-next');
-    const start = rankingPage * RANKING_PAGE_SIZE;
-    const end = start + RANKING_PAGE_SIZE;
-    const pageData = rankingData.slice(start, end);
-    if (pageData.length > 0) {
-        rankingList.innerHTML = pageData.map((row, i) =>
-            `<div class="ranking-row" data-id="${row.id}">
-                <span class="ranking-rank">${start + i + 1}</span>
-                ${row.image ? `<img class="ranking-thumb" src="src/${encodeURIComponent(row.image)}" alt="thumb" style="cursor:pointer" onclick="showImageModal('src/${encodeURIComponent(row.image)}')">` : `<div class="ranking-thumb"></div>`}
-                <span class="ranking-name">${row.name}</span>
-                <span class="ranking-score">${row.score.toLocaleString()}</span>
-                <div class="ranking-delete"><button type="button" class="btn btn-danger" data-id="${row.id}" onclick="deleteRankingEntry(${row.id})">Delete</button></div>
-            </div>`
-        ).join('');
-        // バツボタンのイベントを毎回バインド
-        setTimeout(() => {
-            const closeBtn = document.getElementById('image-modal-close');
-            const modal = document.getElementById('image-modal');
-            if (closeBtn && modal) {
-                closeBtn.onclick = function(e) {
-                    e.stopPropagation();
-                    modal.style.display = 'none';
-                };
-            }
-        }, 100);
-    } else {
-        rankingList.innerHTML = '<div class="text-center text-gray-400">まだ ないよ</div>';
-    }
-    if (btnPrev) btnPrev.disabled = rankingPage === 0;
-    if (btnNext) btnNext.disabled = (rankingPage + 1) * RANKING_PAGE_SIZE >= rankingData.length;
-    // ナビゲーションのclass切り替え
-    const nav = document.querySelector('.ranking-nav');
-    if (nav) {
-        if (rankingPage === 0) {
-            nav.classList.add('page-1');
-        } else {
-            nav.classList.remove('page-1');
-        }
-    }
-}
-
-// DB保存API呼び出し（name引数追加）
+// ---- ここを measurement.js の実装を優先して呼ぶラッパーに置換しました ----
 async function saveResultToDB(combatStats, imageDataUrl, name = 'PLAYER') {
-    try {
-        const res = await fetch('/api/save_score', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                name: name,
-                score: combatStats.total_power || 0,
-                image: imageDataUrl
-            })
-        });
-        const json = await res.json();
-        // simple preview: if image saved, show small preview in name-modal area
-                if (json && json.success && json.image) {
-            try {
-                const preview = document.getElementById('save-preview');
-                if (preview) preview.src = `src/${encodeURIComponent(json.image)}`;
-            } catch(e){}
-        }
-        return json;
-    } catch (e) {
-        alert('保存に失敗しました');
-    }
+	// measurement.js が提供する実装があればそれを使う（重複定義を避ける）
+	if (typeof window !== 'undefined' && typeof window.saveResultToDB === 'function' && window.saveResultToDB !== saveResultToDB) {
+		try { return await window.saveResultToDB(combatStats, imageDataUrl, name); } catch(e) { /* fallthrough to local */ }
+	}
+	// フォールバック: ここは元の POST 実装（measurement.js 未読込時に使用）
+	try {
+		const res = await fetch('/api/save_score', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				name: name,
+				score: combatStats && combatStats.total_power ? combatStats.total_power : 0,
+				image: imageDataUrl
+			})
+		});
+		const json = await res.json();
+		if (json && json.success && json.image) {
+			try {
+				const preview = document.getElementById('save-preview');
+				if (preview) preview.src = `src/${encodeURIComponent(json.image)}`;
+			} catch(e){}
+		}
+		return json;
+	} catch (e) {
+		alert('保存に失敗しました');
+		return null;
+	}
 }
+
 // 効果音再生
 const seButton = document.getElementById('se-button');
 function playButtonSE() {
