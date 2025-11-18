@@ -1,7 +1,13 @@
 // エラー抑制システム
 (function() {
+    // デバッグモード設定
+    window._debugMode = false;
+    
     const suppressPatterns = [
         'chrome-extension://',
+        'moz-extension://',
+        'safari-extension://',
+        'edge-extension://',
         'NotificationContent',
         'ERR_FILE_NOT_FOUND',
         'Device in use',
@@ -30,7 +36,17 @@
         'googleapis',
         '404 (Not Found)',
         'WebSocket connection',
-        'BlockingPageContent'
+        'BlockingPageContent',
+        'QuotaExceededError',
+        'Storage quota exceeded',
+        'LocalStorage is not available',
+        'Tracking Prevention blocked',
+        'coijogkijncjnjkcjjc', // 特定の拡張機能ID
+        'GET chrome-extension',
+        'GET moz-extension',
+        'manifest.json',
+        '_locales',
+        'Content Security Policy'
     ];
     
     const originals = {
@@ -41,6 +57,9 @@
     };
     
     const shouldSuppress = (message) => {
+        // デバッグモードの場合はエラー抑制を無効化
+        if (window._debugMode) return false;
+        
         const str = String(message || '').toLowerCase();
         return suppressPatterns.some(pattern => str.includes(pattern.toLowerCase()));
     };
@@ -65,12 +84,25 @@
     }, true);
     
     window.addEventListener('unhandledrejection', (e) => {
-        const reason = String(e.reason);
+        const reason = String(e.reason || '');
         if (shouldSuppress(reason)) {
             e.preventDefault();
             return false;
         }
     });
+    
+    // リソース読み込みエラーの抑制
+    document.addEventListener('error', (e) => {
+        const target = e.target;
+        if (target && (target.src || target.href)) {
+            const url = target.src || target.href;
+            if (shouldSuppress(url)) {
+                e.preventDefault();
+                e.stopPropagation();
+                return false;
+            }
+        }
+    }, true);
 })();
 
 // バトル進行用の状態
@@ -467,7 +499,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnClearData) {
         btnClearData.addEventListener('click', () => {
             if (confirm('保存されたデータをすべて削除しますか？この操作は元に戻せません。')) {
-                localStorage.clear(); // ローカルストレージをクリア
+                try {
+                    if (typeof(Storage) !== "undefined" && window.localStorage) {
+                        localStorage.clear(); // ローカルストレージをクリア
+                        console.log('ローカルストレージクリア完了');
+                    }
+                } catch (e) {
+                    console.error('ローカルストレージクリアエラー:', e.message);
+                }
                 alert('データを削除しました。');
                 fetchAndShowRanking(); // ランキングを再取得
             }
@@ -486,10 +525,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (confirm('選択したデータを削除しますか？この操作は元に戻せません。')) {
                 const idsToDelete = Array.from(selectedCheckboxes).map(cb => cb.dataset.id);
                 try {
-                    const res = await fetch('api.php', {
+                    const res = await fetch('http://localhost:3001/api/delete_scores', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ action: 'delete_scores', ids: idsToDelete })
+                        body: JSON.stringify({ ids: idsToDelete })
                     });
                     const result = await res.json();
                     if (result.success) {
@@ -519,9 +558,9 @@ function generateImageHtml(row, dataSource, index) {
         return `<img src="${row.image}" alt="thumb" style="width:64px;height:48px;object-fit:cover;border-radius:6px;" onerror="this.parentNode.innerHTML='${defaultIcon.replace(/'/g, "&apos;")}'">`;
     }
     
-    // ファイルパス画像の場合（API）
+    // ファイルパス画像の場合（Node.js API）
     if (dataSource === 'api' && row.image) {
-        return `<img src="src/${row.image}" alt="thumb" style="width:64px;height:48px;object-fit:cover;border-radius:6px;" onerror="this.parentNode.innerHTML='${defaultIcon.replace(/'/g, "&apos;")}'">`;
+        return `<img src="http://localhost:3001/src/${row.image}" alt="thumb" style="width:64px;height:48px;object-fit:cover;border-radius:6px;" onerror="this.parentNode.innerHTML='${defaultIcon.replace(/'/g, "&apos;")}'">`;
     }
     
     return defaultIcon;
@@ -535,9 +574,9 @@ async function fetchAndShowRanking() {
     let data = [];
     let dataSource = 'none';
     
-    // まずAPI接続を試行
+    // Node.js API接続を試行
     try {
-        const res = await fetch('api.php?action=get_ranking');
+        const res = await fetch('http://localhost:3001/api/get_ranking');
         if (res.ok) {
             const apiData = await res.json();
             if (Array.isArray(apiData) && apiData.length > 0) {
@@ -546,19 +585,23 @@ async function fetchAndShowRanking() {
             }
         }
     } catch (e) {
-        console.warn('API接続失敗:', e.message);
+        console.warn('Node.js API接続失敗:', e.message);
     }
     
     // API失敗時はローカルストレージから取得
     if (data.length === 0) {
         try {
-            const localData = JSON.parse(localStorage.getItem('battleIndexRanking') || '[]');
-            if (localData.length > 0) {
-                data = localData.sort((a, b) => (b.score || 0) - (a.score || 0));
-                dataSource = 'local';
+            if (typeof(Storage) !== "undefined" && window.localStorage) {
+                const localData = JSON.parse(localStorage.getItem('battleIndexRanking') || '[]');
+                if (localData.length > 0) {
+                    data = localData.sort((a, b) => (b.score || 0) - (a.score || 0));
+                    dataSource = 'local';
+                }
+            } else {
+                console.warn('LocalStorageが使用できません');
             }
         } catch (e) {
-            console.error('ローカルストレージ読み取り失敗:', e);
+            console.error('ローカルストレージ読み取り失敗:', e.message);
         }
     }
     
@@ -583,20 +626,126 @@ async function fetchAndShowRanking() {
     }
 }
 
+// 戦闘力数値安定化関数
+function stabilizeCombatStats(newStats) {
+    // 履歴に追加
+    combatStatsHistory.push(newStats);
+    if (combatStatsHistory.length > STATS_HISTORY_SIZE) {
+        combatStatsHistory.shift();
+    }
+    
+    // 異常値検出と除去
+    const cleanedStats = removeOutliers(combatStatsHistory);
+    
+    // 移動平均を計算
+    const smoothedStats = calculateMovingAverage(cleanedStats);
+    
+    // 段階的変化を適用
+    const stabilizedStats = applyGradualChange(smoothedStats);
+    
+    return stabilizedStats;
+}
+
+// 異常値除去関数
+function removeOutliers(statsArray) {
+    if (statsArray.length < 3) return statsArray;
+    
+    const totalPowers = statsArray.map(s => s.total_power);
+    const mean = totalPowers.reduce((sum, val) => sum + val, 0) / totalPowers.length;
+    const stdDev = Math.sqrt(totalPowers.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / totalPowers.length);
+    
+    // 標準偏差の2倍を超える値は除外
+    return statsArray.filter(stats => {
+        const deviation = Math.abs(stats.total_power - mean);
+        return deviation <= stdDev * 2;
+    });
+}
+
+// 移動平均計算関数
+function calculateMovingAverage(statsArray) {
+    if (statsArray.length === 0) return null;
+    
+    const avgStats = {
+        total_power: 0,
+        base_power: 0,
+        pose_bonus: 0,
+        expression_bonus: 0,
+        speed_bonus: 0,
+        height: 0,
+        reach: 0,
+        shoulder: 0,
+        expression: 0,
+        pose: 0
+    };
+    
+    // 各値の平均を計算
+    statsArray.forEach(stats => {
+        Object.keys(avgStats).forEach(key => {
+            if (stats[key] !== undefined) {
+                avgStats[key] += stats[key];
+            }
+        });
+    });
+    
+    Object.keys(avgStats).forEach(key => {
+        avgStats[key] = avgStats[key] / statsArray.length;
+    });
+    
+    return avgStats;
+}
+
+// 段階的変化適用関数
+function applyGradualChange(newStats) {
+    if (!lastStableCombatStats || !newStats) {
+        lastStableCombatStats = newStats;
+        return newStats;
+    }
+    
+    const gradualStats = { ...newStats };
+    
+    // 各値に対して段階的変化を適用
+    Object.keys(gradualStats).forEach(key => {
+        if (typeof gradualStats[key] === 'number' && lastStableCombatStats[key] !== undefined) {
+            const currentValue = lastStableCombatStats[key];
+            const targetValue = newStats[key];
+            const difference = targetValue - currentValue;
+            
+            // 変化率を制限
+            const maxChange = Math.abs(currentValue * MAX_CHANGE_RATE);
+            const limitedChange = Math.sign(difference) * Math.min(Math.abs(difference), maxChange);
+            
+            gradualStats[key] = currentValue + limitedChange;
+        }
+    });
+    
+    lastStableCombatStats = gradualStats;
+    return gradualStats;
+}
+
 function updateStats(combat_stats) {
-    window._latestCombatStats = combat_stats;
-    const totalPower = combat_stats.total_power;
+    // 数値を安定化
+    const stabilizedStats = stabilizeCombatStats(combat_stats);
+    
+    if (!stabilizedStats) {
+        return; // 安定化処理失敗時は更新しない
+    }
+    
+    window._latestCombatStats = stabilizedStats;
+    const totalPower = Math.round(stabilizedStats.total_power);
+    
     if (totalPower > maxBattleIndex) { maxBattleIndex = totalPower; }
+    
+    // UIに安定化された値を表示
     measurementElements.totalPower.textContent = totalPower.toLocaleString();
-    measurementElements.basePower.textContent = combat_stats.base_power.toLocaleString();
-    measurementElements.poseBonus.textContent = `+${combat_stats.pose_bonus.toLocaleString()}`;
-    measurementElements.expressionBonus.textContent = `+${combat_stats.expression_bonus.toLocaleString()}`;
-    measurementElements.speedBonus.textContent = `+${combat_stats.speed_bonus.toLocaleString()}`;
-    measurementElements.statHeight.textContent = combat_stats.height ? combat_stats.height.toFixed(2) : '-';
-    measurementElements.statReach.textContent = combat_stats.reach ? combat_stats.reach.toFixed(2) : '-';
-    measurementElements.statShoulder.textContent = combat_stats.shoulder ? combat_stats.shoulder.toFixed(2) : '-';
-    measurementElements.statExpression.textContent = combat_stats.expression ? combat_stats.expression.toFixed(2) : '-';
-    measurementElements.statPose.textContent = combat_stats.pose ? combat_stats.pose.toFixed(2) : '-';
+    measurementElements.basePower.textContent = Math.round(stabilizedStats.base_power).toLocaleString();
+    measurementElements.poseBonus.textContent = `+${Math.round(stabilizedStats.pose_bonus).toLocaleString()}`;
+    measurementElements.expressionBonus.textContent = `+${Math.round(stabilizedStats.expression_bonus).toLocaleString()}`;
+    measurementElements.speedBonus.textContent = `+${Math.round(stabilizedStats.speed_bonus).toLocaleString()}`;
+    measurementElements.statHeight.textContent = stabilizedStats.height ? stabilizedStats.height.toFixed(3) : '-';
+    measurementElements.statReach.textContent = stabilizedStats.reach ? stabilizedStats.reach.toFixed(3) : '-';
+    measurementElements.statShoulder.textContent = stabilizedStats.shoulder ? stabilizedStats.shoulder.toFixed(3) : '-';
+    measurementElements.statExpression.textContent = stabilizedStats.expression ? stabilizedStats.expression.toFixed(3) : '-';
+    measurementElements.statPose.textContent = stabilizedStats.pose ? stabilizedStats.pose.toFixed(3) : '-';
 }
 
 async function saveResultToDB(combatStats, imageDataUrl, name = 'PLAYER') {
@@ -609,7 +758,7 @@ async function saveResultToDB(combatStats, imageDataUrl, name = 'PLAYER') {
     };
     
     try {
-        const res = await fetch('api.php', {
+        const res = await fetch('http://localhost:3001/api/save_score', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -626,7 +775,7 @@ async function saveResultToDB(combatStats, imageDataUrl, name = 'PLAYER') {
                 try {
                     const preview = document.getElementById('save-preview');
                     if (preview) {
-                        preview.src = `src/${json.image}`;
+                        preview.src = `http://localhost:3001/src/${json.image}`;
                         preview.style.display = 'block';
                     }
                 } catch(e){
@@ -641,7 +790,7 @@ async function saveResultToDB(combatStats, imageDataUrl, name = 'PLAYER') {
             throw new Error('Server returned error');
         }
     } catch (e) {
-        console.warn('API保存失敗、ローカルストレージに保存:', e.message);
+        console.warn('Node.js API保存失敗、ローカルストレージに保存:', e.message);
         // API失敗時はローカルストレージに保存
         saveToLocalStorage(scoreData);
         return { success: true, local: true };
@@ -651,6 +800,12 @@ async function saveResultToDB(combatStats, imageDataUrl, name = 'PLAYER') {
 // ローカルストレージ保存機能
 function saveToLocalStorage(scoreData) {
     try {
+        // LocalStorageが使用可能かチェック
+        if (typeof(Storage) === "undefined" || !window.localStorage) {
+            console.warn('LocalStorageがサポートされていません');
+            return false;
+        }
+        
         const existingData = JSON.parse(localStorage.getItem('battleIndexRanking') || '[]');
         const newEntry = {
             id: Date.now(),
@@ -667,8 +822,10 @@ function saveToLocalStorage(scoreData) {
         
         localStorage.setItem('battleIndexRanking', JSON.stringify(existingData));
         console.log('ローカルストレージに保存成功');
+        return true;
     } catch (e) {
-        console.error('ローカルストレージ保存失敗:', e);
+        console.error('ローカルストレージ保存失敗:', e.message);
+        return false;
     }
 }
 
@@ -732,6 +889,13 @@ let lastPoseResults = null;
 let useClientLandmark = true;
 let videoRenderRAF = null;
 
+// 戦闘力安定化システム
+let combatStatsHistory = [];
+let lastStableCombatStats = null;
+const STATS_HISTORY_SIZE = 10; // 移動平均のサンプル数
+const STABILITY_THRESHOLD = 0.15; // 15%以内の変化は安定とみなす
+const MAX_CHANGE_RATE = 0.25; // 1回の更新での最大変化率
+
 var POSE_CONNECTIONS = [
     [0,1],[1,2],[2,3],[3,7],
     [0,4],[4,5],[5,6],[6,8],
@@ -781,6 +945,10 @@ function stopMeasurement() {
     if (videoRenderRAF) { cancelAnimationFrame(videoRenderRAF); videoRenderRAF = null; }
     if (mpCamera) { try { mpCamera.stop(); } catch(e){} mpCamera = null; }
     if (pose) { pose.close(); pose = null; }
+    
+    // 安定化システムをリセット
+    combatStatsHistory = [];
+    lastStableCombatStats = null;
 }
 
 // 対戦用の簡易測定機能
@@ -1255,10 +1423,12 @@ function generateOfflineStats() {
     // MediaPipe実測値を優先
     const realStats = calculateRealBodyStats();
     
+    let rawStats;
+    
     if (realStats && realStats.combatPower) {
         // MediaPipeで計算された実際の戦闘力を使用
         console.log('MediaPipe実測データでオフライン統計生成:', realStats);
-        return {
+        rawStats = {
             total_power: realStats.combatPower,
             base_power: realStats.basePower,
             pose_bonus: realStats.poseBonus,
@@ -1270,38 +1440,39 @@ function generateOfflineStats() {
             expression: Math.random() * 8 + 2,
             pose: realStats.posture / 100
         };
+    } else {
+        // フォールバック: MediaPipe使用不可時のランダム値
+        console.log('MediaPipe使用不可、ランダム値でフォールバック');
+        let height, reach, shoulder, poseScore;
+        
+        height = Math.random() * 25 + 160; // 160-185cm
+        reach = Math.random() * 30 + 150;  // 150-180cm
+        shoulder = Math.random() * 10 + 35; // 35-45cm
+        poseScore = Math.random() * 8 + 2;  // 2-10点
+        
+        // 身体データに基づく戦闘力計算
+        const basePower = Math.floor(height * 15 + reach * 8 + shoulder * 50);
+        const poseBonus = Math.floor(poseScore * 200 + Math.random() * 500);
+        const expressionBonus = Math.floor(Math.random() * 300 + 100);
+        const speedBonus = Math.floor(Math.random() * 400 + 50);
+        const totalPower = basePower + poseBonus + expressionBonus + speedBonus;
+        
+        rawStats = {
+            total_power: totalPower,
+            base_power: basePower,
+            pose_bonus: poseBonus,
+            expression_bonus: expressionBonus,
+            speed_bonus: speedBonus,
+            height: height / 180 - 150/180, // 正規化
+            reach: reach / 120,
+            shoulder: shoulder / 100,
+            expression: Math.random() * 8 + 2,
+            pose: poseScore / 100
+        };
     }
     
-    // フォールバック: MediaPipe使用不可時のランダム値
-    console.log('MediaPipe使用不可、ランダム値でフォールバック');
-    let height, reach, shoulder, poseScore;
-    
-    height = Math.random() * 25 + 160; // 160-185cm
-    reach = Math.random() * 30 + 150;  // 150-180cm
-    shoulder = Math.random() * 10 + 35; // 35-45cm
-    poseScore = Math.random() * 8 + 2;  // 2-10点
-    
-    // 身体データに基づく戦闘力計算
-    const basePower = Math.floor(height * 15 + reach * 8 + shoulder * 50);
-    const poseBonus = Math.floor(poseScore * 200 + Math.random() * 500);
-    const expressionBonus = Math.floor(Math.random() * 300 + 100);
-    const speedBonus = Math.floor(Math.random() * 400 + 50);
-    const totalPower = basePower + poseBonus + expressionBonus + speedBonus;
-    
-    const offlineStats = {
-        total_power: totalPower,
-        base_power: basePower,
-        pose_bonus: poseBonus,
-        expression_bonus: expressionBonus,
-        speed_bonus: speedBonus,
-        height: height / 180 - 150/180, // 正規化
-        reach: reach / 120,
-        shoulder: shoulder / 100,
-        expression: Math.random() * 8 + 2,
-        pose: poseScore / 100
-    };
-    
-    updateStats(offlineStats);
+    // 安定化システムを適用してからUIを更新
+    updateStats(rawStats);
 }
 
 // ===== クリックバトル機能 =====
@@ -1596,64 +1767,41 @@ function saveBattleResult(battleData) {
     
     // ローカルストレージにも保存（オフライン対応）
     try {
-        const localBattles = JSON.parse(localStorage.getItem('battleResults') || '[]');
-        localBattles.push({
-            ...battleData,
-            id: Date.now(),
-            battle_date: new Date().toISOString()
-        });
-        localStorage.setItem('battleResults', JSON.stringify(localBattles));
-        console.log('バトル結果をローカルストレージに保存');
+        if (typeof(Storage) !== "undefined" && window.localStorage) {
+            const localBattles = JSON.parse(localStorage.getItem('battleResults') || '[]');
+            localBattles.push({
+                ...battleData,
+                id: Date.now(),
+                battle_date: new Date().toISOString()
+            });
+            localStorage.setItem('battleResults', JSON.stringify(localBattles));
+            console.log('バトル結果をローカルストレージに保存');
+        } else {
+            console.warn('LocalStorageが使用できません。バトル結果はサーバーのみに保存されます。');
+        }
     } catch (error) {
-        console.error('ローカルストレージ保存エラー:', error);
+        console.error('ローカルストレージ保存エラー:', error.message);
     }
 
-    // サーバーに送信
-    fetch('api.php', {
+    // Node.js APIに送信
+    fetch('http://localhost:3001/api/save_battle_result', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'saveBattleResult', ...battleData })
+        body: JSON.stringify(battleData)
     })
     .then(response => response.json())
     .then(data => {
-        console.log('バトル結果サーバー保存成功:', data);
+        console.log('バトル結果Node.js API保存成功:', data);
     })
     .catch(error => {
-        console.error('バトル結果サーバー保存エラー:', error);
+        console.error('バトル結果Node.js API保存エラー:', error);
     });
 }
 
-// 勝利音を再生（可能であれば）
-function playVictorySound() {
-    try {
-        // 勝利音の再生を試みる（ブラウザがサポートしている場合）
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
-        
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-        
-        oscillator.frequency.setValueAtTime(523, audioContext.currentTime); // C5
-        oscillator.frequency.setValueAtTime(659, audioContext.currentTime + 0.2); // E5
-        oscillator.frequency.setValueAtTime(784, audioContext.currentTime + 0.4); // G5
-        
-        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.6);
-        
-        oscillator.start(audioContext.currentTime);
-        oscillator.stop(audioContext.currentTime + 0.6);
-    } catch (error) {
-        console.log('勝利音再生をスキップ:', error);
-    }
-}
-
-// 現在のランキング削除機能
-function deleteRanking(id) {
 function fetchAndShowBattleRanking() {
     console.log('バトルランキングを取得中...');
     
-    fetch('api.php?action=get_battle_ranking')
+    fetch('http://localhost:3001/api/get_battle_ranking')
         .then(response => response.json())
         .then(data => {
             console.log('バトルランキング取得成功:', data);
@@ -1696,6 +1844,11 @@ function displayBattleRanking(battleRankingData) {
 
 function displayBattleRankingFromLocal() {
     try {
+        if (typeof(Storage) === "undefined" || !window.localStorage) {
+            console.warn('LocalStorageが使用できません。サーバーデータのみ表示します。');
+            return;
+        }
+        
         const localBattles = JSON.parse(localStorage.getItem('battleResults') || '[]');
         const winCounts = {};
         
@@ -1711,7 +1864,7 @@ function displayBattleRankingFromLocal() {
             
         displayBattleRanking(rankingData);
     } catch (e) {
-        console.error('ローカルバトルランキング表示エラー:', e);
+        console.error('ローカルバトルランキング表示エラー:', e.message);
     }
 }
 
@@ -1731,25 +1884,27 @@ function deleteSelectedRankingData() {
     
     // ローカルストレージから削除
     try {
-        const localData = JSON.parse(localStorage.getItem('battleIndexRanking') || '[]');
-        const filteredData = localData.filter(item => !idsToDelete.includes(String(item.id)));
-        localStorage.setItem('battleIndexRanking', JSON.stringify(filteredData));
-        console.log('ローカルデータ削除完了');
+        if (typeof(Storage) !== "undefined" && window.localStorage) {
+            const localData = JSON.parse(localStorage.getItem('battleIndexRanking') || '[]');
+            const filteredData = localData.filter(item => !idsToDelete.includes(String(item.id)));
+            localStorage.setItem('battleIndexRanking', JSON.stringify(filteredData));
+            console.log('ローカルデータ削除完了');
+        }
     } catch (e) {
-        console.error('ローカルデータ削除エラー:', e);
+        console.error('ローカルデータ削除エラー:', e.message);
     }
     
-    // サーバーからも削除を試行
-    fetch('api.php', {
+    // Node.js APIからも削除を試行
+    fetch('http://localhost:3001/api/delete_scores', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'delete_scores', ids: idsToDelete })
+        body: JSON.stringify({ ids: idsToDelete })
     }).then(res => res.json()).then(result => {
         if (result.success) {
-            console.log('サーバーデータ削除完了');
+            console.log('Node.js APIデータ削除完了');
         }
     }).catch(e => {
-        console.warn('サーバーデータ削除失敗:', e);
+        console.warn('Node.js APIデータ削除失敗:', e);
     });
     
     fetchAndShowRanking();
@@ -1761,15 +1916,21 @@ function clearAllRankingData() {
     }
     
     // ローカルストレージクリア
-    localStorage.removeItem('battleIndexRanking');
+    try {
+        if (typeof(Storage) !== "undefined" && window.localStorage) {
+            localStorage.removeItem('battleIndexRanking');
+            console.log('ローカルストレージクリア完了');
+        }
+    } catch (e) {
+        console.error('ローカルストレージクリアエラー:', e.message);
+    }
     
-    // サーバーのクリアも試行
-    fetch('api.php', {
+    // Node.js APIでのクリアも試行
+    fetch('http://localhost:3001/api/clear_all', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'clear_all' })
+        headers: { 'Content-Type': 'application/json' }
     }).catch(e => {
-        console.warn('サーバーデータクリア失敗:', e);
+        console.warn('Node.js APIデータクリア失敗:', e);
     });
     
     alert('すべてのデータを削除しました。');
@@ -1787,4 +1948,4 @@ function getVideoFrame() {
 
 window.addEventListener('DOMContentLoaded', () => {
     showScreen('title');
-});}
+});

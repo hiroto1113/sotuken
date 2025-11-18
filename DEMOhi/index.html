@@ -7,9 +7,10 @@
     <link rel="icon" type="image/x-icon" href="data:image/x-icon;base64,AAABAAEAEBAQAAEABAAoAQAAFgAAACgAAAAQAAAAIAAAAAEABAAAAAAAgAAAAAAAAAAAAAAAEAAAAAAAAAAA">
     <!-- ★★★ 新しいタイトルとフォント ★★★ -->
     <title>スカウター</title>
-    <!-- Tailwind CSS CDN (本番用設定) -->
-    <script src="https://cdn.tailwindcss.com?plugins=forms,typography,aspect-ratio,line-clamp"></script>
+    <!-- Tailwind CSS CDN (開発用) -->
+    <script src="https://cdn.tailwindcss.com"></script>
     <script>
+        // 開発環境用の設定
         tailwind.config = {
             theme: {
                 extend: {
@@ -19,7 +20,27 @@
                         'fzgonta': ['FZGontaKana', 'sans-serif']
                     }
                 }
+            },
+            // v3.3以降でline-clampは標準搭載のため除外
+            plugins: [],
+            corePlugins: {
+                preflight: true
             }
+        }
+        
+        // 本番環境警告を抑制（開発用）
+        if (typeof window !== 'undefined') {
+            const originalWarn = console.warn;
+            console.warn = function(...args) {
+                const message = args.join(' ');
+                if (message.includes('cdn.tailwindcss.com should not be used in production')) {
+                    return; // この警告を抑制
+                }
+                if (message.includes('@tailwindcss/line-clamp')) {
+                    return; // line-clamp警告を抑制
+                }
+                originalWarn.apply(console, args);
+            };
         }
     </script>
     <link rel="stylesheet" href="style.css">
@@ -236,6 +257,37 @@
                     <button id="btn-name-ok" class="btn">OK</button>
                     <button id="btn-name-cancel" class="btn btn-secondary">CANCEL</button>
                 </div>
+            </div>
+        </div>
+
+        <!-- ===== バトル結果モーダル ===== -->
+        <div id="battle-result-modal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-80 z-50 hidden">
+            <div class="card max-w-2xl w-full text-center p-8">
+                <div id="victory-icon" class="text-8xl mb-4">🏆</div>
+                <h2 id="battle-winner-title" class="text-4xl font-orbitron font-bold mb-2">VICTORY!</h2>
+                <div id="battle-winner-name" class="text-3xl text-yellow-300 mb-6">PLAYER 1</div>
+                
+                <div class="grid grid-cols-2 gap-6 mb-6">
+                    <!-- Player 1 結果 -->
+                    <div class="bg-gray-800 p-4 rounded-lg">
+                        <h3 id="p1-result-name" class="text-xl font-bold text-blue-400 mb-2">PLAYER 1</h3>
+                        <div class="text-sm text-gray-400">戦闘力変化</div>
+                        <div id="p1-result-score" class="text-lg text-white mb-2">5000 → 5200</div>
+                        <div id="p1-result-clicks" class="text-sm text-cyan-300">15 クリック</div>
+                    </div>
+                    
+                    <!-- Player 2 結果 -->
+                    <div class="bg-gray-800 p-4 rounded-lg">
+                        <h3 id="p2-result-name" class="text-xl font-bold text-red-400 mb-2">PLAYER 2</h3>
+                        <div class="text-sm text-gray-400">戦闘力変化</div>
+                        <div id="p2-result-score" class="text-lg text-white mb-2">4800 → 4600</div>
+                        <div id="p2-result-clicks" class="text-sm text-cyan-300">13 クリック</div>
+                    </div>
+                </div>
+                
+                <div id="battle-penalty-info" class="text-sm text-yellow-300 mb-6">⚠️ PLAYER 2にペナルティ適用 (-200点)</div>
+                
+                <button id="btn-close-battle-result" class="btn btn-accent">結果を確認</button>
             </div>
         </div>
         <div id="screen-ranking" class="screen hidden card space-y-6">
