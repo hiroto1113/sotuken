@@ -4,14 +4,19 @@ const rankingListEl = document.getElementById('ranking-list');
 
 async function fetchAndShowRanking() {
 	if (!rankingListEl) return;
-	rankingListEl.innerHTML = '<div class="text-center text-gray-400">ローディング...</div>';
+	// Tailwind風の表示文言に合わせる
+	rankingListEl.innerHTML = '<div class="text-center text-gray-400">ろーでぃんぐ...</div>';
 	try {
-		const res = await fetch('/api/get_ranking');
+		// 既存の API を優先。念のため軽いフォールバックを試す（互換性維持）
+		let res = await fetch('/api/get_ranking');
+		if (!res.ok) {
+			try { res = await fetch('api.php?action=get_ranking'); } catch (e) {}
+		}
 		const data = await res.json();
 		const rankingData = Array.isArray(data) ? data : [];
 		renderRanking(rankingData);
 	} catch (e) {
-		rankingListEl.innerHTML = '<div class="text-center text-red-400">ランキング 失敗</div>';
+		rankingListEl.innerHTML = '<div class="text-center text-red-400">らんきんぐ しっぱい</div>';
 	}
 }
 
@@ -22,20 +27,21 @@ function renderRanking(rows) {
 		return;
 	}
 	const html = rows.map((row, idx) => {
-		// 画像が data URL かファイル名かに対応
-		let imgHtml = '<div class="ranking-thumb"></div>';
+		const rank = idx + 1;
+		// 画像が data URL かファイル名かに対応（なければプレースホルダ）
+		let imgHtml = `<div style="width:64px;height:48px;background:#071116;border-radius:6px;"></div>`;
 		if (row.image) {
 			const imgSrc = String(row.image).startsWith('data:') ? row.image : `src/${encodeURIComponent(row.image)}`;
-			imgHtml = `<img class="ranking-thumb" src="${imgSrc}" alt="thumb" style="cursor:pointer">`;
+			imgHtml = `<img class="w-16 h-12 object-cover rounded-md" src="${imgSrc}" alt="thumb">`;
 		}
-		const name = row.name || 'PLAYER';
-		const score = (typeof row.score === 'number') ? row.score.toLocaleString() : (row.score || '0');
-		return `<div class="ranking-row" data-id="${row.id}">
-					<span class="ranking-rank">${idx + 1}</span>
+		const name = escapeHtml(row.name || 'PLAYER');
+		const score = (typeof row.score === 'number') ? row.score.toLocaleString() : (row.score ? escapeHtml(row.score) : '0');
+		return `<div class="flex items-center gap-4 p-2 bg-gray-800 rounded-lg" data-id="${row.id}">
+					<span class="text-2xl font-bold text-cyan-400 w-8 text-center">${rank}</span>
 					${imgHtml}
-					<span class="ranking-name">${escapeHtml(name)}</span>
-					<span class="ranking-score">${score}</span>
-					<div class="ranking-delete"><button type="button" class="btn btn-danger" data-id="${row.id}" onclick="deleteRankingEntry(${row.id})">Delete</button></div>
+					<span class="font-orbitron text-lg flex-1">${name}</span>
+					<span class="font-mono text-xl text-yellow-300">${score}</span>
+					<button type="button" class="btn btn-danger ml-4" data-id="${row.id}" onclick="deleteRankingEntry(${row.id})">けす</button>
 				</div>`;
 	}).join('');
 	rankingListEl.innerHTML = html;
@@ -68,10 +74,7 @@ async function deleteRankingEntry(id) {
 // インライン onclick 用に公開
 try { window.deleteRankingEntry = deleteRankingEntry; } catch(e) {}
 
-// グローバル公開: 他スクリプト（script.js 等）から呼べるようにする
-try { window.fetchAndShowRanking = fetchAndShowRanking; } catch(e) {}
-
-// DOM 準備ができたら読み込み（ranking.html 単体で読み込まれたときの自動表示）
+// DOM 準備ができたら読み込み
 window.addEventListener('DOMContentLoaded', () => {
 	fetchAndShowRanking();
 });
