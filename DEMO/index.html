@@ -51,6 +51,42 @@
             </div>
         </div>
 
+        <div id="screen-battle" class="screen hidden card space-y-6">
+            <h2 class="text-3xl font-bold text-center font-orbitron">BATTLE</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                <div class="p-4 bg-gray-800 rounded text-center">
+                    <img id="battle-img1" src="img/player1.jpg" alt="p1" class="mx-auto w-40 h-40 object-cover rounded-full border-2 border-yellow-400">
+                    <div id="battle-name1" class="text-2xl font-orbitron mt-2">PLAYER1</div>
+                    <div class="mt-4">
+                        <div class="w-full bg-gray-700 h-4 rounded overflow-hidden">
+                            <div id="battle-gauge1" class="bg-yellow-400 h-4" style="width:100%"></div>
+                        </div>
+                        <div id="battle-score1" class="text-yellow-300 text-lg mt-2">0/0</div>
+                    </div>
+                </div>
+                <div class="p-4 bg-gray-800 rounded text-center">
+                    <img id="battle-img2" src="img/player2.jpg" alt="p2" class="mx-auto w-40 h-40 object-cover rounded-full border-2 border-cyan-400">
+                    <div id="battle-name2" class="text-2xl font-orbitron mt-2">PLAYER2</div>
+                    <div class="mt-4">
+                        <div class="w-full bg-gray-700 h-4 rounded overflow-hidden">
+                            <div id="battle-gauge2" class="bg-cyan-400 h-4" style="width:100%"></div>
+                        </div>
+                        <div id="battle-score2" class="text-cyan-300 text-lg mt-2">0/0</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="text-center mt-4">
+                <div id="battle-instruct" class="text-lg text-gray-200 mb-2">バトル開始ボタンを押してください</div>
+                <div id="battle-timer" class="text-4xl font-mono text-white mb-4">00:10</div>
+                <button id="battle-start-btn" class="btn">START</button>
+                <div id="battle-mouse" class="hidden mt-4 cursor-pointer select-none p-8 rounded bg-gradient-to-r from-gray-800 to-gray-700">連打エリア（ここを連打）</div>
+                <div class="mt-6">
+                    <button id="battle-exit" class="btn btn-secondary">戻る</button>
+                </div>
+            </div>
+        </div>
+
         <div id="screen-battle-result" class="screen hidden card space-y-6">
             <h2 class="text-3xl font-bold text-center font-orbitron">バトル　リザルト</h2>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-center">
